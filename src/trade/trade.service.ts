@@ -1,13 +1,17 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import axios from 'axios';
+
 import { User } from '../auth/user.schema';
 import { Asset } from './schema/asset.schema';
 import { Trade } from './schema/trade.schema';
 import { OpenTradeDto } from './dtos/open-trade.dto';
 import { ReferralService } from '../referral/referral.service';
 import { CopyTradeService } from '../copy-trade/copy-trade.service';
-import axios from 'axios';
+
+import CustomResponse from 'src/provider/custom-response.service';
+import CustomError from 'src/provider/customer-error.service';
 
 interface PriceResponse {
   [key: string]: { usd: number };
@@ -16,9 +20,23 @@ interface PriceResponse {
 @Injectable()
 export class TradeService {
   private readonly logger = new Logger(TradeService.name);
-  private config = { payoutPercentage: 80, expirySeconds: 60, spread: 0.01, delay: 1000 };
 
-  private readonly AVAILABLE_ASSETS = ['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE'];
+  private config = {
+    payoutPercentage: 80,
+    expirySeconds: 60,
+    spread: 0.01,
+    delay: 1000,
+  };
+
+  private readonly AVAILABLE_ASSETS = [
+    'BTC',
+    'ETH',
+    'BNB',
+    'SOL',
+    'XRP',
+    'ADA',
+    'DOGE',
+  ];
 
   constructor(
     @InjectModel('User') private userModel: Model<User>,
@@ -28,17 +46,20 @@ export class TradeService {
     private copyTradeService: CopyTradeService,
   ) {}
 
+  // ===================== OPEN TRADE =====================
   async openTrade(userId: string, dto: OpenTradeDto) {
     const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new CustomError(404, 'User not found');
 
     const assetUpper = dto.asset.toUpperCase();
     if (!this.AVAILABLE_ASSETS.includes(assetUpper)) {
-      throw new Error('Asset not available');
+      throw new CustomError(400, 'Asset not available');
     }
 
     const balanceType = dto.type === 'demo' ? 'demoBalance' : 'realBalance';
-    if (user[balanceType] < dto.amount) throw new Error('Insufficient balance');
+    if (user[balanceType] < dto.amount) {
+      throw new CustomError(400, 'Insufficient balance');
+    }
 
     user[balanceType] -= dto.amount;
     await user.save();
@@ -53,16 +74,24 @@ export class TradeService {
       type: dto.type || user.activeMode,
       openPrice,
       status: 'open',
-      expiryTime: new Date(Date.now() + this.config.expirySeconds * 1000),
+      expiryTime: new Date(
+        Date.now() + this.config.expirySeconds * 1000,
+      ),
       isCopy: false,
     });
+
     await trade.save();
 
-    // Copy Trading
+    // ===================== COPY TRADING =====================
     if (user.isLeader && user.followers?.length > 0) {
-      const followers = await this.userModel.find({ _id: { $in: user.followers } });
+      const followers = await this.userModel.find({
+        _id: { $in: user.followers },
+      });
+
       for (const follower of followers) {
-        const fBalanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+        const fBalanceType =
+          trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+
         if (follower[fBalanceType] >= dto.amount) {
           follower[fBalanceType] -= dto.amount;
           await follower.save();
@@ -79,48 +108,72 @@ export class TradeService {
             isCopy: true,
             copiedFrom: userId,
           });
+
           await copyTrade.save();
         }
       }
     }
 
-    setTimeout(() => this.processTradeExpiry(trade._id.toString()), this.config.expirySeconds * 1000);
+    setTimeout(
+      () =>
+        this.processTradeExpiry(
+          trade._id.toString(),
+        ),
+      this.config.expirySeconds * 1000,
+    );
 
-    return { message: 'Trade opened', tradeId: trade._id };
+    return new CustomResponse(200, 'Trade opened', {
+      tradeId: trade._id,
+    });
   }
 
+  // ===================== TRADE EXPIRY =====================
   private async processTradeExpiry(tradeId: string) {
     const trade = await this.tradeModel.findById(tradeId);
     if (!trade || trade.status === 'closed') return;
 
     const closePrice = await this.getCurrentPrice(trade.asset);
 
-    const win = 
-      (trade.direction === 'up' && closePrice > (trade.openPrice || 0)) ||
-      (trade.direction === 'down' && closePrice < (trade.openPrice || 0));
+    const win =
+      (trade.direction === 'up' &&
+        closePrice > (trade.openPrice || 0)) ||
+      (trade.direction === 'down' &&
+        closePrice < (trade.openPrice || 0));
 
-    const payout = win ? trade.amount * (this.config.payoutPercentage / 100) : 0;
+    const payout = win
+      ? trade.amount *
+        (this.config.payoutPercentage / 100)
+      : 0;
 
     trade.status = 'closed';
     trade.closePrice = closePrice;
     trade.result = win ? 'win' : 'loss';
     trade.payout = payout;
+
     await trade.save();
 
     const user = await this.userModel.findById(trade.userId);
     if (user) {
-      const balanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+      const balanceType =
+        trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+
       user[balanceType] += trade.amount + payout;
       await user.save();
 
-      // Referral commission
       if (user.parentReferral) {
-        await this.referralService.creditTradeCommission(trade.userId, payout);
+        await this.referralService.creditTradeCommission(
+          trade.userId,
+          payout,
+        );
       }
     }
 
-    // Copy trades
-    const copyTrades = await this.tradeModel.find({ copiedFrom: trade.userId, status: 'open', isCopy: true });
+    const copyTrades = await this.tradeModel.find({
+      copiedFrom: trade.userId,
+      status: 'open',
+      isCopy: true,
+    });
+
     for (const ct of copyTrades) {
       ct.status = 'closed';
       ct.closePrice = closePrice;
@@ -130,13 +183,15 @@ export class TradeService {
 
       const fUser = await this.userModel.findById(ct.userId);
       if (fUser) {
-        const fBalanceType = ct.type === 'demo' ? 'demoBalance' : 'realBalance';
+        const fBalanceType =
+          ct.type === 'demo' ? 'demoBalance' : 'realBalance';
         fUser[fBalanceType] += ct.amount + payout;
         await fUser.save();
       }
     }
   }
 
+  // ===================== PRICE =====================
   private async getCurrentPrice(asset: string): Promise<number> {
     const mapping: Record<string, string> = {
       BTC: 'bitcoin',
@@ -161,24 +216,41 @@ export class TradeService {
     }
   }
 
+  // ===================== READ =====================
   async getHistory(filter: any) {
-    return this.tradeModel.find(filter).sort({ createdAt: -1 });
+    const data = await this.tradeModel
+      .find(filter)
+      .sort({ createdAt: -1 });
+
+    return new CustomResponse(200, 'Trade history fetched', data);
   }
 
   async getOpenTrades() {
-    return this.tradeModel.find({ status: 'open' });
+    const data = await this.tradeModel.find({
+      status: 'open',
+    });
+    return new CustomResponse(200, 'Open trades fetched', data);
   }
 
   async getClosedTrades() {
-    return this.tradeModel.find({ status: 'closed' });
+    const data = await this.tradeModel.find({
+      status: 'closed',
+    });
+    return new CustomResponse(200, 'Closed trades fetched', data);
   }
 
   async updateAsset(assetId: string, updates: any) {
-    return this.assetModel.findByIdAndUpdate(assetId, updates, { new: true });
+    const asset = await this.assetModel.findByIdAndUpdate(
+      assetId,
+      updates,
+      { new: true },
+    );
+
+    return new CustomResponse(200, 'Asset updated', asset);
   }
 
   async updateConfig(newConfig: any) {
     Object.assign(this.config, newConfig);
-    return this.config;
+    return new CustomResponse(200, 'Trade config updated', this.config);
   }
 }

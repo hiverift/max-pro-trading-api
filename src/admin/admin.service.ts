@@ -1,13 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+
 import { User } from '../auth/user.schema';
 import { Transaction } from 'src/wallet/schema/transaction.schema';
+
+import CustomResponse from 'src/provider/custom-response.service';
+import CustomError from 'src/provider/customer-error.service';
 
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
-    tradeModel: any;
+  tradeModel: any;
+
   constructor(
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Transaction') private transactionModel: Model<Transaction>,
@@ -15,115 +20,161 @@ export class AdminService {
 
   async getDashboard() {
     this.logger.log('Fetching admin dashboard');
+
     const totalUsers = await this.userModel.countDocuments();
-    const activeTraders = await this.userModel.countDocuments({ realBalance: { $gt: 0 } });
-    const totalDeposits = await this.transactionModel.aggregate([{ $match: { type: 'deposit', status: 'success' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]);
-    const totalWithdrawals = await this.transactionModel.aggregate([{ $match: { type: 'withdraw', status: 'success' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]);
-    const pendingKyc = await this.userModel.countDocuments({ kycStatus: 'pending' });
-    // Add more metrics (open/closed trades, alerts)
-    return { userMetrics: { totalUsers, activeTraders }, financialMetrics: { totalDeposits: totalDeposits[0]?.total || 0, totalWithdrawals: totalWithdrawals[0]?.total || 0 }, compliance: { pendingKyc } };
+    const activeTraders = await this.userModel.countDocuments({
+      realBalance: { $gt: 0 },
+    });
+
+    const totalDeposits = await this.transactionModel.aggregate([
+      { $match: { type: 'deposit', status: 'success' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+
+    const totalWithdrawals = await this.transactionModel.aggregate([
+      { $match: { type: 'withdraw', status: 'success' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+
+    const pendingKyc = await this.userModel.countDocuments({
+      kycStatus: 'pending',
+    });
+
+    return new CustomResponse(200, 'Admin dashboard fetched', {
+      userMetrics: {
+        totalUsers,
+        activeTraders,
+      },
+      financialMetrics: {
+        totalDeposits: totalDeposits[0]?.total || 0,
+        totalWithdrawals: totalWithdrawals[0]?.total || 0,
+      },
+      compliance: { pendingKyc },
+    });
   }
 
   async getUsers(query: any) {
-    // Search/filter by email, kycStatus, accountStatus, referralSource
-    return this.userModel.find(query);
+    const users = await this.userModel.find(query);
+    return new CustomResponse(200, 'Users fetched', users);
   }
 
   async updateUser(userId: string, updates: any) {
-    const user = await this.userModel.findByIdAndUpdate(userId, updates, { new: true });
-    return user;
+    const user = await this.userModel.findByIdAndUpdate(userId, updates, {
+      new: true,
+    });
+    return new CustomResponse(200, 'User updated', user);
   }
 
- async adjustBalance(userId: string, amount: number, reason: string) {
-  const user = await this.userModel.findById(userId);
-  if (!user) throw new Error('User not found');
-  user.realBalance += amount;
-  await user.save();
-  // ...
-}
+  async adjustBalance(userId: string, amount: number, reason: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new CustomError(404, 'User not found');
+
+    user.realBalance += amount;
+    await user.save();
+
+    return new CustomResponse(200, 'Balance adjusted', {
+      amount,
+      reason,
+    });
+  }
 
   async getKycPending() {
-    return this.userModel.find({ kycStatus: 'pending' });
+    const users = await this.userModel.find({ kycStatus: 'pending' });
+    return new CustomResponse(200, 'Pending KYC users fetched', users);
   }
 
   async approveKyc(userId: string) {
-    await this.userModel.findByIdAndUpdate(userId, { kycStatus: 'approved' });
-    return { message: 'KYC approved' };
+    await this.userModel.findByIdAndUpdate(userId, {
+      kycStatus: 'approved',
+    });
+
+    return new CustomResponse(200, 'KYC approved');
   }
 
   async getDeposits() {
-    return this.transactionModel.find({ type: 'deposit' });
+    const deposits = await this.transactionModel.find({ type: 'deposit' });
+    return new CustomResponse(200, 'Deposits fetched', deposits);
   }
 
- async approveDeposit(txId: string) {
-  const tx = await this.transactionModel.findById(txId);
-  if (!tx) throw new Error('Transaction not found');
-  tx.status = 'success';
-  await tx.save();
-  const user = await this.userModel.findById(tx.userId);
-  if (!user) throw new Error('User not found');
-  user.realBalance += tx.amount;
-  await user.save();
-  // ...
-}
+  async approveDeposit(txId: string) {
+    const tx = await this.transactionModel.findById(txId);
+    if (!tx) throw new CustomError(404, 'Transaction not found');
 
+    tx.status = 'success';
+    await tx.save();
 
+    const user = await this.userModel.findById(tx.userId);
+    if (!user) throw new CustomError(404, 'User not found');
 
+    user.realBalance += tx.amount;
+    await user.save();
 
-
-
+    return new CustomResponse(200, 'Deposit approved');
+  }
 
   async getWithdrawals() {
-    return this.transactionModel.find({ type: 'withdraw', status: 'pending' });
+    const withdrawals = await this.transactionModel.find({
+      type: 'withdraw',
+      status: 'pending',
+    });
+
+    return new CustomResponse(200, 'Withdrawals fetched', withdrawals);
   }
 
   async approveWithdrawal(txId: string) {
     const tx = await this.transactionModel.findById(txId);
-    if (!tx) throw new Error('Transaction not found');
+    if (!tx) throw new CustomError(404, 'Transaction not found');
+
     tx.status = 'success';
     await tx.save();
-    // Deduct commission if needed
-    return { message: 'Withdrawal approved' };
+
+    return new CustomResponse(200, 'Withdrawal approved');
   }
 
   async rejectWithdrawal(txId: string) {
     const tx = await this.transactionModel.findById(txId);
-    if (!tx) throw new Error('Transaction not found');
+    if (!tx) throw new CustomError(404, 'Transaction not found');
+
     tx.status = 'failed';
     await tx.save();
+
     const user = await this.userModel.findById(tx.userId);
-    if (!user) throw new Error('User not found');
-    user.realBalance += Math.abs(tx.amount); // Refund
+    if (!user) throw new CustomError(404, 'User not found');
+
+    user.realBalance += Math.abs(tx.amount);
     await user.save();
-    return { message: 'Withdrawal rejected' };
+
+    return new CustomResponse(200, 'Withdrawal rejected');
   }
 
-  // Add wallet controls (enable/disable withdrawal, freeze)
   async freezeWallet(userId: string) {
-    // Add field or logic
-    return { message: 'Wallet frozen' };
+    // Stub / logic unchanged
+    return new CustomResponse(200, 'Wallet frozen');
   }
 
-  // Updated src/admin/admin.service.ts (add approveLeader)
-async approveLeader(userId: string) {
-  const user = await this.userModel.findById(userId);
-  if (user) {
-    user.isLeader = true;
-    await user.save();
+  async approveLeader(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (user) {
+      user.isLeader = true;
+      await user.save();
+    }
+
+    return new CustomResponse(200, 'Leader approved');
   }
-  return { message: 'Leader approved' };
-}
 
-async getHighLossAlerts(threshold = -1000) {
-  const aggregates = await this.tradeModel.aggregate([
-    { $group: { _id: '$userId', totalPayout: { $sum: '$payout' } } },
-    { $match: { totalPayout: { $lt: threshold } } },
-  ]);
-  return aggregates;
-}
+  async getHighLossAlerts(threshold = -1000) {
+    const aggregates = await this.tradeModel.aggregate([
+      { $group: { _id: '$userId', totalPayout: { $sum: '$payout' } } },
+      { $match: { totalPayout: { $lt: threshold } } },
+    ]);
 
-async getApiDowntimeAlerts() {
-  // Stub, check health
-  return { downtime: false };
-}
+    return new CustomResponse(200, 'High loss alerts fetched', aggregates);
+  }
+
+  async getApiDowntimeAlerts() {
+    // Stub
+    return new CustomResponse(200, 'API downtime status', {
+      downtime: false,
+    });
+  }
 }

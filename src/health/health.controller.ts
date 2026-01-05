@@ -1,5 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, MongooseHealthIndicator } from '@nestjs/terminus';
+import {
+  HealthCheck,
+  HealthCheckService,
+  MongooseHealthIndicator,
+} from '@nestjs/terminus';
+
+import CustomResponse from 'src/provider/custom-response.service';
 
 @Controller('health')
 export class HealthController {
@@ -10,9 +16,11 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
-  check() {
-    return this.health.check([
+  async check() {
+    const result = await this.health.check([
       () => this.mongoose.pingCheck('database', { timeout: 1500 }),
     ]);
+
+    return new CustomResponse(200, 'Health check successful', result);
   }
 }
