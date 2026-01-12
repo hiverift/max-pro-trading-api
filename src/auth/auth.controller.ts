@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body,Patch, Query, UseGuards, Req,NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Body,Patch, Query, UseGuards, Req,NotFoundException, Delete } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
@@ -92,5 +92,10 @@ async forgotPassword(@Body() dto: ForgotPasswordDto) {
 @Post('reset-password')
 async resetPassword(@Body() dto: ResetPasswordDto) {
   return this.authService.resetPassword(dto.token, dto.newPassword);
+}
+
+@Delete()
+async deleteUser(@Req() req) {
+  return this.authService.deleteUser(req.user.userId);
 }
 }

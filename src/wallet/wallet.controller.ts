@@ -53,5 +53,13 @@ async getHistory(
   });
 }
 
+
+@Get('balance')
+@UseGuards(JwtAuthGuard)
+async getBalance(@Req() req) {
+  return this.walletService.getBalance(req.user.userId);
+}
+
+
   // Add /bonus endpoint if needed
 }

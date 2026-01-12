@@ -4,18 +4,18 @@ import { Model } from 'mongoose';
 
 import { User } from '../auth/user.schema';
 import { Transaction } from 'src/wallet/schema/transaction.schema';
-
+import { Trade } from 'src/trade/schema/trade.schema';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
 
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
-  tradeModel: any;
 
   constructor(
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Transaction') private transactionModel: Model<Transaction>,
+    @InjectModel('Trade') private tradeModel: Model<Trade>,
   ) {}
 
   async getDashboard() {
@@ -167,7 +167,9 @@ export class AdminService {
       { $group: { _id: '$userId', totalPayout: { $sum: '$payout' } } },
       { $match: { totalPayout: { $lt: threshold } } },
     ]);
-
+     if (aggregates.length === 0) { 
+      return new CustomResponse(204, 'No high loss alerts found', []);
+    }
     return new CustomResponse(200, 'High loss alerts fetched', aggregates);
   }
 

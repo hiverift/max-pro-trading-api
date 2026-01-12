@@ -13,7 +13,7 @@ import { CopyTradeService } from '../copy-trade/copy-trade.service';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
 
-interface PriceResponse {
+interface PriceResponse { 
   [key: string]: { usd: number };
 }
 
@@ -44,55 +44,57 @@ export class TradeService {
     @InjectModel('Trade') private tradeModel: Model<Trade>,
     private referralService: ReferralService,
     private copyTradeService: CopyTradeService,
-  ) {}
+  ) { }
 
   // ===================== OPEN TRADE =====================
   async openTrade(userId: string, dto: OpenTradeDto) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new CustomError(404, 'User not found');
 
+
+    if (dto.type === 'real' && user.kycStatus !== 'approved') {
+      throw new CustomError(403, 'KYC approval required for real trades');
+    }
+
     const assetUpper = dto.asset.toUpperCase();
     if (!this.AVAILABLE_ASSETS.includes(assetUpper)) {
-      throw new CustomError(400, 'Asset not available');
+      throw new CustomError(400, 'Asset not available or disabled');
     }
 
     const balanceType = dto.type === 'demo' ? 'demoBalance' : 'realBalance';
-    if (user[balanceType] < dto.amount) {
+    if ((user[balanceType] || 0) < dto.amount) {
       throw new CustomError(400, 'Insufficient balance');
     }
+
 
     user[balanceType] -= dto.amount;
     await user.save();
 
     const openPrice = await this.getCurrentPrice(assetUpper);
 
+    const expiryTime = new Date(Date.now() + this.config.expirySeconds * 1000);
+
     const trade = new this.tradeModel({
       userId,
       asset: assetUpper,
       amount: dto.amount,
       direction: dto.direction,
-      type: dto.type || user.activeMode,
+      type: dto.type,
       openPrice,
       status: 'open',
-      expiryTime: new Date(
-        Date.now() + this.config.expirySeconds * 1000,
-      ),
+      expiryTime,
       isCopy: false,
     });
 
     await trade.save();
 
-    // ===================== COPY TRADING =====================
-    if (user.isLeader && user.followers?.length > 0) {
-      const followers = await this.userModel.find({
-        _id: { $in: user.followers },
-      });
+    if (user.isLeader && user.followers && user.followers.length > 0) {
+      const followers = await this.userModel.find({ _id: { $in: user.followers } });
 
       for (const follower of followers) {
-        const fBalanceType =
-          trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+        const fBalanceType = dto.type === 'demo' ? 'demoBalance' : 'realBalance';
 
-        if (follower[fBalanceType] >= dto.amount) {
+        if ((follower[fBalanceType] || 0) >= dto.amount) {
           follower[fBalanceType] -= dto.amount;
           await follower.save();
 
@@ -101,10 +103,10 @@ export class TradeService {
             asset: assetUpper,
             amount: dto.amount,
             direction: dto.direction,
-            type: trade.type,
+            type: dto.type,
             openPrice,
             status: 'open',
-            expiryTime: trade.expiryTime,
+            expiryTime,
             isCopy: true,
             copiedFrom: userId,
           });
@@ -114,59 +116,69 @@ export class TradeService {
       }
     }
 
-    setTimeout(
-      () =>
-        this.processTradeExpiry(
-          trade._id.toString(),
-        ),
-      this.config.expirySeconds * 1000,
-    );
 
-    return new CustomResponse(200, 'Trade opened', {
+    setTimeout(() => {
+      this.processTradeExpiry(trade._id.toString()).catch(err => {
+        console.error('Expiry processing failed:', err);
+      });
+    }, this.config.expirySeconds * 1000);
+
+    return new CustomResponse(200, 'Trade opened successfully', {
       tradeId: trade._id,
+      asset: assetUpper,
+      amount: dto.amount,
+      direction: dto.direction,
+      expiryInSeconds: this.config.expirySeconds,
+      openPrice,
     });
   }
 
-  // ===================== TRADE EXPIRY =====================
+
   private async processTradeExpiry(tradeId: string) {
     const trade = await this.tradeModel.findById(tradeId);
-    if (!trade || trade.status === 'closed') return;
-
+    if (!trade || trade.status === 'closed') {
+      console.log(`Trade expiry skipped: ${tradeId} (not found or already closed)`);
+      return;
+    }
+    if (!trade.openPrice) {
+      console.error(`Open price missing for trade ${tradeId}`);
+      return;
+    }
     const closePrice = await this.getCurrentPrice(trade.asset);
 
+    const spread = this.config.spread || 0.0001;
+    const adjustedOpen = trade.openPrice * (1 + (trade.direction === 'up' ? spread : -spread));
     const win =
-      (trade.direction === 'up' &&
-        closePrice > (trade.openPrice || 0)) ||
-      (trade.direction === 'down' &&
-        closePrice < (trade.openPrice || 0));
+      (trade.direction === 'up' && closePrice > adjustedOpen) ||
+      (trade.direction === 'down' && closePrice < adjustedOpen);
 
     const payout = win
-      ? trade.amount *
-        (this.config.payoutPercentage / 100)
+      ? trade.amount * (this.config.payoutPercentage / 100)
       : 0;
 
     trade.status = 'closed';
     trade.closePrice = closePrice;
     trade.result = win ? 'win' : 'loss';
     trade.payout = payout;
-
     await trade.save();
 
     const user = await this.userModel.findById(trade.userId);
     if (user) {
-      const balanceType =
-        trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+      const balanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+
 
       user[balanceType] += trade.amount + payout;
       await user.save();
 
-      if (user.parentReferral) {
-        await this.referralService.creditTradeCommission(
-          trade.userId,
-          payout,
-        );
+      if (user.parentReferral && this.referralService) {
+        try {
+          await this.referralService.creditTradeCommission(trade.userId, payout);
+        } catch (err) {
+          console.error('Referral commission error:', err);
+        }
       }
     }
+
 
     const copyTrades = await this.tradeModel.find({
       copiedFrom: trade.userId,
@@ -183,15 +195,14 @@ export class TradeService {
 
       const fUser = await this.userModel.findById(ct.userId);
       if (fUser) {
-        const fBalanceType =
-          ct.type === 'demo' ? 'demoBalance' : 'realBalance';
+        const fBalanceType = ct.type === 'demo' ? 'demoBalance' : 'realBalance';
         fUser[fBalanceType] += ct.amount + payout;
         await fUser.save();
       }
     }
   }
 
-  // ===================== PRICE =====================
+
   private async getCurrentPrice(asset: string): Promise<number> {
     const mapping: Record<string, string> = {
       BTC: 'bitcoin',

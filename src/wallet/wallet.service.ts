@@ -14,17 +14,18 @@ import { Trade } from '../trade/schema/trade.schema';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
 
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
   private minWithdrawal = 100;
-  private depositLimits = { min: 10, max: 10000 };
+  private depositLimits = { min: 10, max: 1000000000 };
 
   constructor(
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Transaction') private transactionModel: Model<Transaction>,
     @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
-  ) {}
+  ) { }
 
   // ===================== DEPOSIT =====================
   async deposit(userId: string, dto: DepositDto) {
@@ -211,12 +212,31 @@ export class WalletService {
       status: 'success',
     });
 
-    await tx.save();
+    const savedTx = await tx.save();
     await this.cacheManager.del(`dashboard_${userId}`);
 
-    return new CustomResponse(200, 'Bonus added successfully');
+    return new CustomResponse(200, 'Bonus added successfully',savedTx);
   }
 
+
+  async getBalance(userId: string) {
+
+    try {
+      const user = await this.userModel.findById(userId);
+      if (!user) throw new Error('User not found');
+      const balance = {
+        realBalance: user.realBalance,
+        bonusBalance: user.bonusBalance,
+        demoBalance: user.demoBalance,
+        totalBalance: user.realBalance + user.bonusBalance,
+      };
+
+      return new CustomResponse(200, 'Balance fetched successfully', balance);
+    } catch (error) {
+      throw(error);
+    }
+
+  }
   // ===================== DESCRIPTION =====================
   private getTransactionDescription(tx: any) {
     switch (tx.type) {

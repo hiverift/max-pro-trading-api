@@ -81,7 +81,7 @@ export class AuthService {
     }
   }
 
-  // ===================== LOGIN =====================
+  
   async login(user: any, rememberMe = false) {
     const payload = {
       userId: user._id,
@@ -96,6 +96,7 @@ export class AuthService {
 
     return new CustomResponse(200, 'Login successful', {
       accessToken: token,
+
     });
   }
 
@@ -274,4 +275,13 @@ export class AuthService {
     return null;
   }
 
+  async deleteUser(userId: string) {
+    const user = await this.userModel.findByIdAndDelete(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const deleteuser = await user.save();
+
+    return new CustomResponse(200, 'Password reset successful', deleteuser);
+  }
 }
