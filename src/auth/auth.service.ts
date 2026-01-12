@@ -68,7 +68,7 @@ export class AuthService {
       console.log('user dindoe ', user1)
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       await this.cacheManager.set(`otp_${dto.email}`, otp, 300);
-     
+
       return new CustomResponse(
         201,
         'User created successfully. OTP sent to email',
@@ -81,7 +81,7 @@ export class AuthService {
     }
   }
 
-  
+
   async login(user: any, rememberMe = false) {
     const payload = {
       userId: user._id,
@@ -91,11 +91,16 @@ export class AuthService {
     };
 
     const expiresIn = rememberMe ? '7d' : '1h';
-
+    const userRecord = await this.userModel.findById(user._id);
+    if (!userRecord) {
+      throw new BadRequestException('User Not Found. Contact support.');
+    }
     const token = this.jwtService.sign(payload, { expiresIn });
+   
 
     return new CustomResponse(200, 'Login successful', {
-      accessToken: token,
+     accessToken: token,
+      user: user,
 
     });
   }
@@ -216,7 +221,7 @@ export class AuthService {
     if (!user) {
       return new CustomResponse(
         200,
-        'If email exists, reset link has been sent',
+        'User not found. If the email exists, a reset link has been sent.',
       );
     }
 
@@ -229,13 +234,12 @@ export class AuthService {
     await user.save();
 
     console.log(
-      `Reset link: http://localhost:3000/reset-password?token=${token}`,
+      `Reset link:${process.env.FRONTEND_URL}/reset-password?token=${token}`,
     );
-
     return new CustomResponse(200, 'Password reset link sent');
   }
 
-  // ===================== RESET PASSWORD =====================
+
   async resetPassword(token: string, newPassword: string) {
     const user = await this.userModel.findOne({
       resetPasswordToken: token,
@@ -254,7 +258,6 @@ export class AuthService {
   }
 
   async validateGoogleUser(email: string, googleId: string) {
-    console.log(`Validating Google user with email: ${email}`);
     let user = await this.userModel.findOne({ email });
     if (!user) {
       user = new this.userModel({ email, googleId });

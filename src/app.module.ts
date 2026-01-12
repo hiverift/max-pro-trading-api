@@ -20,9 +20,12 @@ import { SupportController } from './support/support.controller';
 import { UserController } from './user/user.controller';
 import { UserModule } from './user/user.module';
 import { UserService } from './user/user.service';
-
+import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     ScheduleModule.forRoot(),
     MongooseModule.forRoot('mongodb+srv://rs5045280:xbpneTRReMJD9LAc@cluster0.sbbouj5.mongodb.net/trading-db'),
     CacheModule.register({ isGlobal: true }),

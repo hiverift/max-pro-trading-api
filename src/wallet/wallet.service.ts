@@ -78,7 +78,6 @@ export class WalletService {
     return new CustomResponse(200, 'Deposit approved');
   }
 
-  // ===================== WITHDRAW =====================
   async withdraw(userId: string, dto: WithdrawDto) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new CustomError(404, 'User not found');
