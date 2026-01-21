@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import axios from 'axios';
@@ -13,7 +13,7 @@ import { CopyTradeService } from '../copy-trade/copy-trade.service';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
 
-interface PriceResponse { 
+interface PriceResponse {
   [key: string]: { usd: number };
 }
 
@@ -60,8 +60,9 @@ export class TradeService {
     if (!this.AVAILABLE_ASSETS.includes(assetUpper)) {
       throw new CustomError(400, 'Asset not available or disabled');
     }
-
+    console.log('asset upper',dto.type === 'demo' ? 'demoBalance' : 'realBalance')
     const balanceType = dto.type === 'demo' ? 'demoBalance' : 'realBalance';
+    console.log('balance type',balanceType)
     if ((user[balanceType] || 0) < dto.amount) {
       throw new CustomError(400, 'Insufficient balance');
     }
@@ -134,73 +135,84 @@ export class TradeService {
   }
 
 
-  private async processTradeExpiry(tradeId: string) {
-    const trade = await this.tradeModel.findById(tradeId);
-    if (!trade || trade.status === 'closed') {
-      console.log(`Trade expiry skipped: ${tradeId} (not found or already closed)`);
-      return;
-    }
-    if (!trade.openPrice) {
-      console.error(`Open price missing for trade ${tradeId}`);
-      return;
-    }
-    const closePrice = await this.getCurrentPrice(trade.asset);
+ private async processTradeExpiry(tradeId: string) {
+  const trade = await this.tradeModel.findById(tradeId);
+  if (!trade || trade.status === 'closed') {
+    console.log(`Trade expiry skipped: ${tradeId} (not found or already closed)`);
+    return;
+  }
 
-    const spread = this.config.spread || 0.0001;
-    const adjustedOpen = trade.openPrice * (1 + (trade.direction === 'up' ? spread : -spread));
-    const win =
-      (trade.direction === 'up' && closePrice > adjustedOpen) ||
-      (trade.direction === 'down' && closePrice < adjustedOpen);
+  if (!trade.openPrice) {
+    console.error(`Open price missing for trade ${tradeId}`);
+    return;
+  }
 
-    const payout = win
-      ? trade.amount * (this.config.payoutPercentage / 100)
-      : 0;
+  const closePrice = await this.getCurrentPrice(trade.asset);
 
-    trade.status = 'closed';
-    trade.closePrice = closePrice;
-    trade.result = win ? 'win' : 'loss';
-    trade.payout = payout;
-    await trade.save();
+  // Apply spread (house edge)
+  const spread = this.config.spread || 0.0001;
+  const adjustedOpen = trade.openPrice * (1 + (trade.direction === 'up' ? spread : -spread));
 
-    const user = await this.userModel.findById(trade.userId);
-    if (user) {
-      const balanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+  const win =
+    (trade.direction === 'up' && closePrice > adjustedOpen) ||
+    (trade.direction === 'down' && closePrice < adjustedOpen);
 
+  const payout = win
+    ? trade.amount * (this.config.payoutPercentage / 100)
+    : 0;
 
-      user[balanceType] += trade.amount + payout;
-      await user.save();
+  // Update trade
+  trade.status = 'closed';
+  trade.closePrice = closePrice;
+  trade.result = win ? 'win' : 'loss';
+  trade.payout = payout;
+  await trade.save();
 
-      if (user.parentReferral && this.referralService) {
-        try {
-          await this.referralService.creditTradeCommission(trade.userId, payout);
-        } catch (err) {
-          console.error('Referral commission error:', err);
-        }
+  console.log(`Trade ${tradeId} closed: ${win ? 'WIN' : 'LOSS'}, Payout: ${payout}`);
+
+  const user = await this.userModel.findById(trade.userId);
+  if (user) {
+    const balanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+
+    user[balanceType] += trade.amount + payout;
+    await user.save();
+
+    console.log(`User ${user._id} balance updated (${balanceType}): ${user[balanceType]}`);
+
+    if (trade.type === 'real' && user.parentReferral && this.referralService) {
+      try {
+        await this.referralService.creditTradeCommission(trade.userId, payout);
+        console.log(`Referral commission credited for referrer of user ${user._id}`);
+      } catch (err) {
+        console.error('Referral commission error:', err);
       }
     }
+  } else {
+    console.error(`User not found for trade ${tradeId}`);
+  }
 
+  const copyTrades = await this.tradeModel.find({
+    copiedFrom: trade.userId,
+    status: 'open',
+    isCopy: true,
+  });
 
-    const copyTrades = await this.tradeModel.find({
-      copiedFrom: trade.userId,
-      status: 'open',
-      isCopy: true,
-    });
+  for (const ct of copyTrades) {
+    ct.status = 'closed';
+    ct.closePrice = closePrice;
+    ct.result = win ? 'win' : 'loss';
+    ct.payout = payout;
+    await ct.save();
 
-    for (const ct of copyTrades) {
-      ct.status = 'closed';
-      ct.closePrice = closePrice;
-      ct.result = win ? 'win' : 'loss';
-      ct.payout = payout;
-      await ct.save();
-
-      const fUser = await this.userModel.findById(ct.userId);
-      if (fUser) {
-        const fBalanceType = ct.type === 'demo' ? 'demoBalance' : 'realBalance';
-        fUser[fBalanceType] += ct.amount + payout;
-        await fUser.save();
-      }
+    const fUser = await this.userModel.findById(ct.userId);
+    if (fUser) {
+      const fBalanceType = ct.type === 'demo' ? 'demoBalance' : 'realBalance';
+      fUser[fBalanceType] += ct.amount + payout;
+      await fUser.save();
+      console.log(`Copy trade ${ct._id} closed for follower ${fUser._id}, balance: ${fUser[fBalanceType]}`);
     }
   }
+}
 
 
   private async getCurrentPrice(asset: string): Promise<number> {
@@ -263,5 +275,87 @@ export class TradeService {
   async updateConfig(newConfig: any) {
     Object.assign(this.config, newConfig);
     return new CustomResponse(200, 'Trade config updated', this.config);
+  }
+
+  async reverseTrade(userId: string, tradeId: string) {
+    const trade = await this.tradeModel.findById(tradeId);
+    if (!trade) throw new NotFoundException('Trade not found');
+    if (trade.userId.toString() !== userId) throw new ForbiddenException('Not your trade');
+    if (trade.status !== 'open') throw new BadRequestException('Trade already closed');
+
+    const currentPrice = await this.getCurrentPrice(trade.asset);
+
+    const spread = this.config.spread || 0.0001;
+    if (!trade.openPrice) {
+      return new CustomError(500, 'Open price missing for trade');
+    }
+    const adjustedOpen = trade.openPrice * (1 + (trade.direction === 'up' ? spread : -spread));
+
+    const originalWin =
+      (trade.direction === 'up' && currentPrice > adjustedOpen) ||
+      (trade.direction === 'down' && currentPrice < adjustedOpen);
+
+    const originalPayout = originalWin ? trade.amount * (this.config.payoutPercentage / 100) : 0;
+
+    // Reverse direction
+    const newDirection = trade.direction === 'up' ? 'down' : 'up';
+
+    // New win/loss after reverse (current price pe)
+    const newWin =
+      (newDirection === 'up' && currentPrice > trade.openPrice) ||
+      (newDirection === 'down' && currentPrice < trade.openPrice);
+
+    const newPayout = newWin ? trade.amount * (this.config.payoutPercentage / 100) : 0;
+
+    // Final balance update
+    const user = await this.userModel.findById(userId);
+    if (user) {
+      const balanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+      // Original stake wapas + new payout
+      user[balanceType] += trade.amount + newPayout;
+      await user.save();
+    }
+
+    // Update trade
+    trade.status = 'closed';
+    trade.closePrice = currentPrice;
+    trade.result = newWin ? 'win' : 'loss';
+    trade.payout = newPayout;
+    trade.direction = newDirection; // Optional: reverse direction save
+    await trade.save();
+
+
+    return new CustomResponse(200, 'Trade reversed and closed', {
+      originalDirection: trade.direction,
+      newDirection,
+      originalResult: originalWin ? 'win' : 'loss',
+      finalResult: newWin ? 'win' : 'loss',
+      finalPayout: newPayout,
+    });
+
+  }
+  async cancelTrade(userId: string, tradeId: string) {
+    const trade = await this.tradeModel.findById(tradeId);
+    if (!trade) throw new NotFoundException('Trade not found');
+    if (trade.userId.toString() !== userId) throw new ForbiddenException('Not your trade');
+    if (trade.status !== 'open') throw new BadRequestException('Trade already closed or expired');
+
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const balanceType = trade.type === 'demo' ? 'demoBalance' : 'realBalance';
+    user[balanceType] += trade.amount; 
+    await user.save();
+
+    trade.status = 'cancelled';
+    trade.result = 'cancelled';
+    trade.payout = 0;
+    await trade.save();
+
+    // Agar copy trade tha to follower ko bhi wapas
+    if (trade.isCopy && trade.copiedFrom) {
+  
+    }
+    return new CustomResponse(200, 'Trade cancelled, amount refunded', { amountRefunded: trade.amount });
   }
 }

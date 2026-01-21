@@ -18,6 +18,7 @@ export class Trade extends Document {
   @Prop() openPrice?: number;
   @Prop() closePrice?: number;
   @Prop() expiryTime?: Date;
+  @Prop() copiedFrom?: string;
   
 }
 

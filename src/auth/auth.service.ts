@@ -17,7 +17,8 @@ import { User } from './user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-
+import fs from 'fs';
+import { fileUpload } from 'src/util/fileupload';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
 
@@ -96,10 +97,10 @@ export class AuthService {
       throw new BadRequestException('User Not Found. Contact support.');
     }
     const token = this.jwtService.sign(payload, { expiresIn });
-   
+
 
     return new CustomResponse(200, 'Login successful', {
-     accessToken: token,
+      accessToken: token,
       user: user,
 
     });
@@ -138,7 +139,7 @@ export class AuthService {
   async verify2FA(userId: string, token: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new CustomError(404, 'User not found');
-
+    console.log('user twoFactorSecret', user.twoFactorSecret, token);
     const verified = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
@@ -199,7 +200,7 @@ export class AuthService {
     return new CustomResponse(200, 'Profile fetched', user);
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto) {
+  async updateProfile(userId: string, dto: UpdateProfileDto, file?: Express.Multer.File) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new CustomError(404, 'User not found');
 
@@ -208,11 +209,17 @@ export class AuthService {
       if (exists) throw new CustomError(400, 'Email already in use');
     }
 
-    Object.assign(user, dto);
-    await user.save();
+    const avatart = fileUpload('profileImage', file);
+    if (file) {
+      user.avatarPath = `${process.env.SERVER_BASE_URL}/uploads/profileImage/${avatart}`; // store local path or S3 URL
+    }
 
-    return new CustomResponse(200, 'Profile updated successfully');
+    Object.assign(user, dto);
+    const updatedUser = await user.save();
+
+    return new CustomResponse(200, 'Profile updated successfully', updatedUser);
   }
+
 
   // ===================== FORGOT PASSWORD =====================
   async forgotPassword(email: string) {
@@ -236,9 +243,8 @@ export class AuthService {
     console.log(
       `Reset link:${process.env.FRONTEND_URL}/reset-password?token=${token}`,
     );
-    return new CustomResponse(200, 'Password reset link sent');
+    return new CustomResponse(200, 'Password reset link sent', { resetlink: `${process.env.FRONTEND_URL}/reset-password?token=${token}` });
   }
-
 
   async resetPassword(token: string, newPassword: string) {
     const user = await this.userModel.findOne({

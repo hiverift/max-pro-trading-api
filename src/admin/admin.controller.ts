@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Post, Param, Body, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Put, Post, Param, Body, Req, UseGuards, Query, Delete } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
 import { RolesGuard } from 'src/common/gaurds/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -8,7 +8,7 @@ import { AdminService } from './admin.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 export class AdminController {
-  constructor(private adminService: AdminService) {}
+  constructor(private adminService: AdminService) { }
 
   @Get('dashboard')
   getDashboard() {
@@ -71,21 +71,42 @@ export class AdminController {
   }
 
   @Put('user/:id/approve-leader')
-approveLeader(@Param('id') id: string) {
-  return this.adminService.approveLeader(id);
-}
+  approveLeader(@Param('id') id: string) {
+    return this.adminService.approveLeader(id);
+  }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'superadmin')
-@Get('alerts/high-loss')
-getHighLossAlerts() {
-  return this.adminService.getHighLossAlerts();
-}
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'superadmin')
+  @Get('alerts/high-loss')
+  getHighLossAlerts() {
+    return this.adminService.getHighLossAlerts();
+  }
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'superadmin')
-@Get('alerts/api-downtime')
-getApiDowntimeAlerts() {
-  return this.adminService.getApiDowntimeAlerts();
-}
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'superadmin')
+  @Get('alerts/api-downtime')
+  getApiDowntimeAlerts() {
+    return this.adminService.getApiDowntimeAlerts();
+  }
+
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin') // Only superadmin delete kar sake
+  @Delete('users/:userId')
+  async deleteUser(@Param('userId') userId: string) {
+    return this.adminService.deleteUser(userId);
+  }
+
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin')
+  // @Delete(':userId')
+  // async deleteKyc(@Param('userId') userId: string) {
+  //   return this.adminService.deleteKyc(userId);
+  // }
+
+  // @UseGuards(JwtAuthGuard)
+  // @Delete('my')
+  // async deleteMyKyc(@Req() req) {
+  //   return this.adminService.deleteKyc(req.user.userId);
+  // }
 }

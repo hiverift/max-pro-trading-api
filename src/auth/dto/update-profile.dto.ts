@@ -28,4 +28,8 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  avatarPath?: string;
 }

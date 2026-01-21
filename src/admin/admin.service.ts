@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -16,7 +16,7 @@ export class AdminService {
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Transaction') private transactionModel: Model<Transaction>,
     @InjectModel('Trade') private tradeModel: Model<Trade>,
-  ) {}
+  ) { }
 
   async getDashboard() {
     this.logger.log('Fetching admin dashboard');
@@ -167,7 +167,7 @@ export class AdminService {
       { $group: { _id: '$userId', totalPayout: { $sum: '$payout' } } },
       { $match: { totalPayout: { $lt: threshold } } },
     ]);
-     if (aggregates.length === 0) { 
+    if (aggregates.length === 0) {
       return new CustomResponse(204, 'No high loss alerts found', []);
     }
     return new CustomResponse(200, 'High loss alerts fetched', aggregates);
@@ -179,4 +179,40 @@ export class AdminService {
       downtime: false,
     });
   }
+
+  async deleteUser(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    // Delete related data (trades, transactions, referrals, etc.)
+    await this.tradeModel.deleteMany({ userId });
+    await this.transactionModel.deleteMany({ userId });
+
+    // Optional: Remove from referrals
+    if (user.parentReferral) {
+      await this.userModel.updateOne(
+        { referralCode: user.parentReferral },
+        { $pull: { referrals: user.referralCode } }
+      );
+    }
+
+    await user.deleteOne();
+    return new CustomResponse(200, 'User and all related data deleted successfully');
+  }
+
+  // async deleteKyc(userId: string) {
+  //   const user = await this.userModel.findById(userId);
+  //   if (!user) throw new NotFoundException('User not found');
+
+  //   if (user.kycDocumentPath) {
+  //     // Optional: Delete file from disk
+  //     // fs.unlinkSync(user.kycDocumentPath);
+  //   }
+
+  //   user.kycStatus = 'pending';
+  //   user.kycDocumentPath = null;
+  //   await user.save();
+  //   return new CustomResponse(200, 'KYC document deleted/rejected', { status: user.kycStatus });
+
+  // }
 }

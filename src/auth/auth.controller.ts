@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body,Patch, Query, UseGuards, Req,NotFoundException, Delete } from '@nestjs/common';
+import { Controller, Post,UseInterceptors,UploadedFile, Get, Body, Patch, Query, UseGuards, Req, NotFoundException, Delete } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
@@ -8,11 +8,12 @@ import { AuthGuard } from '@nestjs/passport';
 import { SwitchModeDto } from './dto/switch-mode.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';    
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   @Post('signup')
   signup(@Body() dto: CreateUserDto) {
@@ -28,7 +29,7 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(AuthGuard('google'))
-  googleAuth() {}
+  googleAuth() { }
 
 
   @Get('google/callback')
@@ -64,38 +65,43 @@ export class AuthController {
     return this.authService.getDashboard(req.user.userId);
   }
 
-@UseGuards(JwtAuthGuard)
-@Post('switch-mode')
-async switchMode(@Req() req, @Body() dto: SwitchModeDto) {
+  @UseGuards(JwtAuthGuard)
+  @Post('switch-mode')
+  async switchMode(@Req() req, @Body() dto: SwitchModeDto) {
 
- return await this.authService.switchMode(req.user.userId, dto);
+    return await this.authService.switchMode(req.user.userId, dto);
 
-}
+  }
 
-@UseGuards(JwtAuthGuard)
-@Get('profile')
-async getProfile(@Req() req) {
-  return this.authService.getProfile(req.user.userId);
-}
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async getProfile(@Req() req) {
+    return this.authService.getProfile(req.user.userId);
+  }
 
 @UseGuards(JwtAuthGuard)
 @Patch('profile')
-async updateProfile(@Req() req, @Body() dto: UpdateProfileDto) {
-  return this.authService.updateProfile(req.user.userId, dto);
+@UseInterceptors(FileInterceptor('avatar'))   // avatar field name
+async updateProfile(
+  @Req() req,
+  @Body() dto: UpdateProfileDto,
+  @UploadedFile() file: Express.Multer.File,
+) {
+  return this.authService.updateProfile(req.user.userId, dto, file);
 }
 
-@Post('forgot-password')
-async forgotPassword(@Body() dto: ForgotPasswordDto) {
-  return this.authService.forgotPassword(dto.email);
-}
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
 
-@Post('reset-password')
-async resetPassword(@Body() dto: ResetPasswordDto) {
-  return this.authService.resetPassword(dto.token, dto.newPassword);
-}
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
 
-@Delete()
-async deleteUser(@Req() req) {
-  return this.authService.deleteUser(req.user.userId);
-}
+  @Delete()
+  async deleteUser(@Req() req) {
+    return this.authService.deleteUser(req.user.userId);
+  }
 }

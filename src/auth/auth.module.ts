@@ -8,6 +8,7 @@ import { GoogleStrategy } from './google.strategy';
 import { UserModule } from 'src/user/user.module';
 import { JwtModule } from '@nestjs/jwt';
 
+console.log("jdoneonodoen", process.env.JWT_SECRET || 'default_secret')
 @Module({
   imports: [
     UserModule, // ✅ user model yahin se milega

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get,Delete, Put, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
 import { RolesGuard } from 'src/common/gaurds/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -43,7 +43,7 @@ export class TradeController {
     updateConfig(@Body() newConfig) {
         return this.tradeService.updateConfig(newConfig);
     }
-    
+
     @UseGuards(JwtAuthGuard)
     @Get('history')
     async getTradeHistory(@Req() req, @Query('mode') mode?: 'demo' | 'real') {
@@ -53,4 +53,16 @@ export class TradeController {
         return this.tradeService.getHistory(filter);
     }
 
-}
+    @UseGuards(JwtAuthGuard)
+    @Post(':tradeId/reverse')
+    async reverseTrade(@Req() req, @Param('tradeId') tradeId: string) {
+        return this.tradeService.reverseTrade(req.user.userId, tradeId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete(':tradeId/cancel')
+    async cancelTrade(@Req() req, @Param('tradeId') tradeId: string) {
+        return this.tradeService.cancelTrade(req.user.userId, tradeId);
+    }
+
+} 

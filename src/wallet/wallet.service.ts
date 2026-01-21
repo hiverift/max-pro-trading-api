@@ -116,7 +116,7 @@ export class WalletService {
     });
   }
 
-  // ===================== BONUS EXPIRY CRON =====================
+
   @Cron('0 0 * * *')
   async checkBonusExpiry() {
     this.logger.log('Checking bonus expiries');
@@ -214,12 +214,11 @@ export class WalletService {
     const savedTx = await tx.save();
     await this.cacheManager.del(`dashboard_${userId}`);
 
-    return new CustomResponse(200, 'Bonus added successfully',savedTx);
+    return new CustomResponse(200, 'Bonus added successfully', savedTx);
   }
 
 
   async getBalance(userId: string) {
-
     try {
       const user = await this.userModel.findById(userId);
       if (!user) throw new Error('User not found');
@@ -229,14 +228,13 @@ export class WalletService {
         demoBalance: user.demoBalance,
         totalBalance: user.realBalance + user.bonusBalance,
       };
-
       return new CustomResponse(200, 'Balance fetched successfully', balance);
     } catch (error) {
-      throw(error);
+      throw (error);
     }
 
   }
-  // ===================== DESCRIPTION =====================
+
   private getTransactionDescription(tx: any) {
     switch (tx.type) {
       case 'deposit':

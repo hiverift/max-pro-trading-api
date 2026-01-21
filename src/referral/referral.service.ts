@@ -77,7 +77,7 @@ export class ReferralService {
       referralLink: `https://tradepro.com/signup?ref=${user.referralCode}`,
       registeredReferrals: user.referrals.length,
       walletBalance: user.realBalance + user.bonusBalance,
-      portfolioValue: user.realBalance * 1.1, // dummy
+      portfolioValue: user.realBalance * 1.1,
       commissionRate: user.commissionRate,
       totalCommissionsEarned: user.totalReferralEarnings,
     });
@@ -122,7 +122,7 @@ export class ReferralService {
     });
   }
 
-  // ===================== CREDIT TRADE COMMISSION =====================
+  // ===================== CREDIT TRADE COMMISSION ====================
   async creditTradeCommission(userId: string, payout: number) {
     const commissionRate = 0.1;
     const commission = payout * commissionRate;

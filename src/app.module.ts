@@ -16,38 +16,49 @@ import { CopyTradeModule } from './copy-trade/copy-trade.module';
 import { HealthController } from './health/health.controller';
 import { ReferralService } from './referral/referral.service';
 import { PromoController } from './promo/promo.controller';
-import { SupportController } from './support/support.controller';
 import { UserController } from './user/user.controller';
 import { UserModule } from './user/user.module';
 import { UserService } from './user/user.service';
 import { ConfigModule } from '@nestjs/config';
+import { KycModule } from './kyc/kyc.module';
+import { join } from 'path';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { TicketModule } from './ticket/ticket.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'), // Path to the folder containing the uploaded images
+    }),
     ScheduleModule.forRoot(),
-    MongooseModule.forRoot('mongodb+srv://rs5045280:xbpneTRReMJD9LAc@cluster0.sbbouj5.mongodb.net/trading-db'),
+    MongooseModule.forRoot(process.env.MONGO_URI as string, {
+      retryAttempts: 0,   // do not retry forever
+      retryDelay: 0,
+    })
+    ,
     CacheModule.register({ isGlobal: true }),
     TerminusModule,
     JwtModule.register({
-      global: true,
-      secret: 'default_secret',
+      global: true,   
+      secret: process.env.JWT_SECRET || 'default_secret',
       signOptions: { expiresIn: '1h' },
     }),
     PassportModule,
     AuthModule,
     WalletModule,
-    ReferralModule, 
+    ReferralModule,
     InfluencerModule,
     AdminModule,
     TradeModule,
     CopyTradeModule,
-    TransactionModule,
-    UserModule
-  
+    UserModule,
+    KycModule,
+    TicketModule
+
   ],
-  controllers: [HealthController, PromoController, SupportController, UserController],  // ← Only root controllers here
-  providers: [ReferralService, UserService],                    // ← Remove all manual providers
+  controllers: [HealthController, PromoController, UserController],  // ← Only root controllers here
+  providers: [ReferralService, UserService],
 })
-export class AppModule {}
+export class AppModule { }
