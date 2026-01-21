@@ -91,7 +91,7 @@ export class AdminController {
 
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('superadmin') // Only superadmin delete kar sake
+  @Roles('admin') // Only superadmin delete kar sake
   @Delete('users/:userId')
   async deleteUser(@Param('userId') userId: string) {
     return this.adminService.deleteUser(userId);
