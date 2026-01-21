@@ -22,7 +22,7 @@ import { StartKycDto, CompleteKycDto, ReKycDto } from './dto/create-kyc.dto';
 
 @Controller('kyc')
 export class KycController {
-  constructor(private readonly kycService: KycService) {}
+  constructor(private readonly kycService: KycService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post('start')
@@ -30,6 +30,12 @@ export class KycController {
     return this.kycService.startKyc(req.user.userId, dto.phone);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('verify-otp')
+  async verifyKycOtp(@Req() req, @Body('otp') otp: string) {
+    if (!otp?.trim()) throw new BadRequestException('OTP required');
+    return this.kycService.verifyKycOtp(req.user.userId, otp.trim());
+  }
   /**
    * Complete Standard KYC – PAN + Aadhaar upload (form-data)
    * Fields: incomeBracket, occupation, panNumber, aadhaarNumber, isPep (optional)

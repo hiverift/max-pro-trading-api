@@ -6,24 +6,66 @@ import { Kyc } from './entities/kyc.entity';
 import * as fs from 'fs';
 import { CompleteKycDto, ReKycDto, StartKycDto } from './dto/create-kyc.dto';
 import CustomResponse from 'src/provider/custom-response.service';
+import { Otp } from 'src/auth/otp.schema';
 
 @Injectable()
 export class KycService {
   constructor(
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Kyc') private kycModel: Model<Kyc>,
+    @InjectModel('Otp') private otpModel: Model<Otp>,
   ) {}
 
   async startKyc(userId: string, phone: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
 
-    user.phone = phone;
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save OTP in DB with 5 min expiry
+    const otp = new this.otpModel({
+      userId,
+      phone,
+      code: otpCode,
+      type: 'kyc_phone_verify',
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+    });
+    await otp.save();
+
+    // TODO: Integrate real SMS/OTP service here
+    console.log(`OTP sent to ${phone}: ${otpCode}`); // For testing – replace with real SMS
+
+    user.phone = phone; // Store phone temporarily
     await user.save();
 
-    // TODO: Send OTP here
-    return new CustomResponse(200, 'OTP sent to phone. Verify to proceed.', { phone });
+    return new CustomResponse(200, 'OTP sent to phone. Verify to proceed.', { phone:phone,otp:otpCode });
   }
+
+  // New: Verify OTP for KYC start
+  async verifyKycOtp(userId: string, otpCode: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const otp = await this.otpModel.findOne({
+      userId,
+      code: otpCode,
+      type: 'kyc_phone_verify',
+      expiresAt: { $gt: new Date() }, // Not expired
+    });
+
+    if (!otp) throw new BadRequestException('Invalid or expired OTP');
+
+    // OTP verified – delete it
+    await otp.deleteOne();
+
+    // Mark phone verified (optional field in user schema)
+    user.phoneVerified = true;
+    await user.save();
+
+    return new CustomResponse(200, 'Phone verified successfully. Proceed to complete KYC.');
+  }
+
 
   async completeKyc(
     userId: string,

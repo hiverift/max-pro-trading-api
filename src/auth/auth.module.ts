@@ -7,10 +7,12 @@ import { JwtStrategy } from './jwt.strategy';
 import { GoogleStrategy } from './google.strategy';
 import { UserModule } from 'src/user/user.module';
 import { JwtModule } from '@nestjs/jwt';
-
+import { MongooseModule } from '@nestjs/mongoose';
+import { OtpSchema } from './otp.schema';
 console.log("jdoneonodoen", process.env.JWT_SECRET || 'default_secret')
 @Module({
   imports: [
+    MongooseModule.forFeature([{ name: 'Otp', schema: OtpSchema },]),
     UserModule, // ✅ user model yahin se milega
     PassportModule.register({ defaultStrategy: 'jwt' }),
      JwtModule.register({
