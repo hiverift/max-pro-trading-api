@@ -19,6 +19,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import fs from 'fs';
 import { fileUpload } from 'src/util/fileupload';
+import { sendEmail } from 'src/util/mailerutil';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
 
@@ -243,7 +244,15 @@ export class AuthService {
     console.log(
       `Reset link:${process.env.FRONTEND_URL}/reset-password?token=${token}`,
     );
-    return new CustomResponse(200, 'Password reset link sent', { resetlink: `${process.env.FRONTEND_URL}/reset-password?token=${token}` });
+
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    await sendEmail(
+      email,
+      'Password Reset Request',
+      `You requested a password reset. Click the link to reset your password: ${resetLink} . If you did not request this, ignore this email.`
+    );
+
+    return new CustomResponse(200, 'Password reset link sent to your email', { resetlink: resetLink });
   }
 
   async resetPassword(token: string, newPassword: string) {
