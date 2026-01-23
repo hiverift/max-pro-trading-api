@@ -145,7 +145,7 @@ export class KycService {
         : null,
     });
   }
-
+  
   async deleteKyc(userId: string) {
     const kyc = await this.kycModel.findOne({ userId });
     if (!kyc) throw new NotFoundException('No KYC record found');

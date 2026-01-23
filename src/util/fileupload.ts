@@ -17,16 +17,14 @@ export const fileUpload = (folderName: string, file: any) => {
   }
 
   const fileExtension = path.extname(file.originalname).toLowerCase();
- 
+
   if (!allowedExtensions.includes(fileExtension)) {
     throw new BadRequestException(
       'Only .jpg, .jpeg, or .png files are allowed',
     );
   }
-
   const fileName = `${Date.now()}-${file.originalname}`;
   const filePath = path.join(publicFolderPath, fileName);
-
 
   // Ensure the uploads folder exists
   if (!fs.existsSync(publicFolderPath)) {

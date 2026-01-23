@@ -5,6 +5,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
+import { GoogleStrategy } from './auth/google.strategy';
 import { TransactionModule } from './transaction/transaction.module';
 import { AuthModule } from './auth/auth.module';
 import { WalletModule } from './wallet/wallet.module';
@@ -59,6 +60,6 @@ import { TicketModule } from './ticket/ticket.module';
 
   ],
   controllers: [HealthController, PromoController, UserController],  // ← Only root controllers here
-  providers: [ReferralService, UserService],
+  providers: [ReferralService, UserService,GoogleStrategy],
 })
 export class AppModule { }

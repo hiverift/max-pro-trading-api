@@ -115,10 +115,6 @@ export class KycController {
     return this.kycService.deleteKyc(req.user.userId);
   }
 
-  // ────────────────────────────────────────────────
-  // ADMIN ENDPOINTS
-  // ────────────────────────────────────────────────
-
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'superadmin')
   @Get('pending')
