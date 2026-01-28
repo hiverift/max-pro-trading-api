@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Notification,NotificationSchema } from './entities/notification.entity';
+import { Notification, NotificationSchema } from './entities/notification.entity';
 import { User } from '../auth/user.schema';
 import { sendEmail } from 'src/util/mailerutil'; // your email util
 
@@ -14,7 +14,7 @@ export class NotificationService {
   constructor(
     @InjectModel(Notification.name) private notificationModel: Model<Notification>,
     @InjectModel('User') private userModel: Model<User>,
-  ) {}
+  ) { }
 
   // Send notification to single user (in-app + optional email/SMS)
   async sendToUser(userId: string, title: string, message: string, type: string = 'info', actionUrl?: string, template?: string) {
@@ -30,7 +30,7 @@ export class NotificationService {
       template,
     });
 
-   console.log(`Notification created for user ${user}: ${title}`);
+    console.log(`Notification created for user ${user}: ${title}`);
     if (user.email) {
       await sendEmail(
         user.email,
@@ -41,7 +41,7 @@ export class NotificationService {
 
     // Optional: SMS (add Twilio later)
     return new CustomResponse(201, 'Notification sent', notification);
-  
+
   }
 
   // Broadcast to all users or filtered (role, KYC status, etc.)
@@ -67,8 +67,8 @@ export class NotificationService {
   async getMyNotifications(userId: string, unreadOnly: boolean = false) {
     const filter: any = { userId };
     console.log(`Fetching notifications for user ${userId}, unreadOnly: ${unreadOnly}`);
-    if (unreadOnly) filter.isRead = false;
-
+    if (unreadOnly == false) filter.isRead = false;
+    console.log(`Filter applied: ${JSON.stringify(filter)}`);
     const notifications = await this.notificationModel
       .find(filter)
       .sort({ createdAt: -1 })
@@ -88,7 +88,7 @@ export class NotificationService {
 
     if (!notification) throw new NotFoundException('Notification not found or not yours');
     return new CustomResponse(200, 'Notification marked as read', notification);
-  
+
   }
 
   // Admin: Get sent logs (broadcast + single)
@@ -98,7 +98,7 @@ export class NotificationService {
       .populate('userId', 'email')
       .sort({ createdAt: -1 })
       .limit(100);
-    
+
 
     return new CustomResponse(200, 'Notification logs fetched', logs);
   }
