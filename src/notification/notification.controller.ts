@@ -6,16 +6,16 @@ import { NotificationService } from './notification.service';
 
 @Controller('notifications')
 export class NotificationController {
-  constructor(private notificationService: NotificationService) {}
+  constructor(private notificationService: NotificationService) { }
 
-  // User: Get my notifications
+
   @UseGuards(JwtAuthGuard)
   @Get()
   async getMyNotifications(@Req() req, @Query('unreadOnly') unreadOnly: string = 'false') {
     return this.notificationService.getMyNotifications(req.user.userId, unreadOnly === 'true');
   }
 
-  // User: Mark as read
+
   @UseGuards(JwtAuthGuard)
   @Put(':id/read')
   async markAsRead(@Req() req, @Param('id') id: string) {
@@ -45,12 +45,12 @@ export class NotificationController {
         body.template,
       );
     } else {
-      // Broadcast to all
+
       return this.notificationService.broadcast(
         body.title,
         body.message,
         body.type,
-        {}, // filter all
+        {},
       );
     }
   }

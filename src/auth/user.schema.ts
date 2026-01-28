@@ -64,7 +64,7 @@ export class User extends Document {
   lockUntil?: Date; // temp lock expiry
 
   @Prop()
-  loggedOutUntil?: Date; // force logout expiry
+  forceLogoutAt?: Date; // force logout expiry
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -5,6 +5,10 @@ import { Notification,NotificationSchema } from './entities/notification.entity'
 import { User } from '../auth/user.schema';
 import { sendEmail } from 'src/util/mailerutil'; // your email util
 
+import CustomError from 'src/provider/customer-error.service';
+import CustomResponse from 'src/provider/custom-response.service';
+
+
 @Injectable()
 export class NotificationService {
   constructor(
@@ -26,7 +30,7 @@ export class NotificationService {
       template,
     });
 
-    // Optional: Email
+
     if (user.email) {
       await sendEmail(
         user.email,
@@ -36,8 +40,8 @@ export class NotificationService {
     }
 
     // Optional: SMS (add Twilio later)
-
-    return notification;
+    return new CustomResponse(201, 'Notification sent', notification);
+  
   }
 
   // Broadcast to all users or filtered (role, KYC status, etc.)
@@ -56,12 +60,13 @@ export class NotificationService {
     // Optional: Email broadcast (loop or queue)
     // users.forEach(user => sendEmail(user.email, title, message));
 
-    return { message: 'Broadcast sent', count: users.length };
+    return new CustomResponse(201, 'Broadcast sent', { count: users.length });
   }
 
   // Get my notifications (user)
   async getMyNotifications(userId: string, unreadOnly: boolean = false) {
     const filter: any = { userId };
+    console.log(`Fetching notifications for user ${userId}, unreadOnly: ${unreadOnly}`);
     if (unreadOnly) filter.isRead = false;
 
     const notifications = await this.notificationModel
@@ -82,8 +87,8 @@ export class NotificationService {
     );
 
     if (!notification) throw new NotFoundException('Notification not found or not yours');
-
-    return notification;
+    return new CustomResponse(200, 'Notification marked as read', notification);
+  
   }
 
   // Admin: Get sent logs (broadcast + single)
@@ -93,7 +98,8 @@ export class NotificationService {
       .populate('userId', 'email')
       .sort({ createdAt: -1 })
       .limit(100);
+    
 
-    return logs;
+    return new CustomResponse(200, 'Notification logs fetched', logs);
   }
 }

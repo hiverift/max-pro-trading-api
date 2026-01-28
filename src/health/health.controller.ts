@@ -10,7 +10,7 @@ import CustomResponse from 'src/provider/custom-response.service';
 @Controller('health')
 export class HealthController {
   constructor(
-    private health: HealthCheckService,
+    private health  : HealthCheckService,
     private mongoose: MongooseHealthIndicator,
   ) {}
 

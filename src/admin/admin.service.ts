@@ -36,10 +36,10 @@ export class AdminService {
   // ADMIN AUTHENTICATION + 2FA (Milestone 1 Complete)
   // ────────────────────────────────────────────────
 
-  async adminLogin(email: string, password: string,ip: string, userAgent: string) {
+  async adminLogin(email: string, password: string, ip: string, userAgent: string) {
     console.log(`Admin login attempt for ${email}`);
     const admin = await this.userModel.findOne({ email, role: { $in: ['admin', 'superadmin'] } });
-   if (!admin) {
+    if (!admin) {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid email');
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -344,7 +344,7 @@ export class AdminService {
       `Your new password is: <strong>${newPassword}</strong><br>Please change it immediately after login.`,
     );
 
-    return new CustomResponse(200, 'Password reset and sent to user email', { userId:userId, newPassword:newPassword });
+    return new CustomResponse(200, 'Password reset and sent to user email', { userId: userId, newPassword: newPassword });
   }
 
   async adjustBalance(userId: string, amount: number, reason: string) {
@@ -367,8 +367,8 @@ export class AdminService {
     try {
       const res = await axios.get(`http://ip-api.com/json/${ip}`);
       console.log('Geo IP response:', res.data);
-      geo = { country:"indiy" };
-    } catch {}
+      geo = { country: "indiy" };
+    } catch { }
 
     await this.loginLogModel.create({
       userId,
@@ -407,18 +407,27 @@ export class AdminService {
   }
 
   // Force Logout (single session or all)
-  async forceLogout(userId: string, sessionId?: string, reason: string = 'Admin forced logout') {
+  async forceLogout(
+    userId: string,
+    sessionId?: string,
+    reason: string = 'Admin forced logout',
+  ) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
 
-    // Simple: mark logout time (JWT Strategy will check this)
-    user.loggedOutUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    // 🔥 Invalidate all existing JWTs
+    user.forceLogoutAt = new Date();
     await user.save();
 
     await this.logAudit('force_logout', userId, { reason, sessionId });
 
-    return new CustomResponse(200, 'User logged out from all sessions', { userId });
+    return new CustomResponse(
+      200,
+      'User logged out from all sessions',
+      { userId },
+    );
   }
+
 
   // Audit Log – Call this after every admin action
   async logAudit(action: string, targetId: string, changes: any, reason?: string, performedBy?: string, ip?: string) {
