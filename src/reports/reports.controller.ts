@@ -10,7 +10,7 @@ import express from 'express';
 @Roles('admin', 'superadmin')
 export class ReportsController {
   constructor(private service: ReportsService) {}
-
+x
   @Get('users')
   async getUserReports(@Query() query: any) {
     return this.service.getUserReports(query);
