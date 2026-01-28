@@ -26,6 +26,7 @@ import { join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { TicketModule } from './ticket/ticket.module';
 import { NotificationModule } from './notification/notification.module';
+import { ReportsModule } from './reports/reports.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -58,7 +59,8 @@ import { NotificationModule } from './notification/notification.module';
     UserModule,
     KycModule,
     TicketModule,
-    NotificationModule
+    NotificationModule,
+    ReportsModule
 
   ],
   controllers: [HealthController, PromoController, UserController],  // ← Only root controllers here

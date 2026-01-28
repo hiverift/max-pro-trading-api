@@ -30,7 +30,7 @@ export class NotificationService {
       template,
     });
 
-
+   console.log(`Notification created for user ${user}: ${title}`);
     if (user.email) {
       await sendEmail(
         user.email,
@@ -58,7 +58,7 @@ export class NotificationService {
     await this.notificationModel.insertMany(notifications);
 
     // Optional: Email broadcast (loop or queue)
-    // users.forEach(user => sendEmail(user.email, title, message));
+    users.forEach(user => sendEmail(user.email, title, message));
 
     return new CustomResponse(201, 'Broadcast sent', { count: users.length });
   }
