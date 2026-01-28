@@ -5,6 +5,7 @@ export const generateOTP = () => {
 };
 
 export const sendEmail = async (to, subject, text) => {
+  console.log('Preparing to send email to:', process.env.MAIL_USER); // 🔥
   const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.MAIL_PORT || '587'),

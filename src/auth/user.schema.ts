@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import test from 'node:test';
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -52,6 +53,18 @@ export class User extends Document {
   @Prop() zip?: string;
   @Prop({ default: false }) emailVerified: boolean;
   @Prop() phoneVerified?: Boolean;
+  @Prop({ default: false }) isWalletFrozen: boolean;
+  @Prop() lastLogin?: Date;
+  @Prop() isBlocked?: boolean;
+  @Prop() blockReason?: string;
+  @Prop({ default: false })
+  isLocked: boolean;
+
+  @Prop()
+  lockUntil?: Date; // temp lock expiry
+
+  @Prop()
+  loggedOutUntil?: Date; // force logout expiry
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

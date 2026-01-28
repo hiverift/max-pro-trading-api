@@ -25,6 +25,7 @@ import { KycModule } from './kyc/kyc.module';
 import { join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { TicketModule } from './ticket/ticket.module';
+import { NotificationModule } from './notification/notification.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -56,7 +57,8 @@ import { TicketModule } from './ticket/ticket.module';
     CopyTradeModule,
     UserModule,
     KycModule,
-    TicketModule
+    TicketModule,
+    NotificationModule
 
   ],
   controllers: [HealthController, PromoController, UserController],  // ← Only root controllers here

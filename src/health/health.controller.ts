@@ -20,7 +20,6 @@ export class HealthController {
     const result = await this.health.check([
       () => this.mongoose.pingCheck('database', { timeout: 1500 }),
     ]);
-
-    return new CustomResponse(200, 'Health check successful', result);
+   return new CustomResponse(200, 'Health check successful', result);
   }
 }

@@ -124,13 +124,10 @@ export class AuthService {
   async enable2FA(userId: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new CustomError(404, 'User not found');
-
     const secret = speakeasy.generateSecret({ length: 20 });
     user.twoFactorSecret = secret.base32;
     user.twoFactorEnabled = true;
-
     await user.save();
-
     return new CustomResponse(200, '2FA enabled', {
       qrCode: secret.otpauth_url,
     });
