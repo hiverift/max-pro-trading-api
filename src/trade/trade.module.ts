@@ -7,6 +7,7 @@ import { TradeSchema } from './schema/trade.schema';
 import { UserSchema } from '../auth/user.schema';
 import { ReferralModule } from 'src/referral/referral.module';
 import { CopyTradeModule } from '../copy-trade/copy-trade.module';  // ← ADD THIS TOO
+import { TradeSettings ,TradeSettingsSchema} from './schema/settings.schema';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CopyTradeModule } from '../copy-trade/copy-trade.module';  // ← ADD T
       { name: 'Asset', schema: AssetSchema },
       { name: 'Trade', schema: TradeSchema },
       { name: 'User', schema: UserSchema },
+      { name: 'TradeSettings', schema: TradeSettingsSchema },
     ]),
     ReferralModule,     // ← ADD THIS LINE
     CopyTradeModule,    // ← ADD THIS LINE (for CopyTradeService)

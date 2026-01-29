@@ -82,7 +82,7 @@ export class AdminService {
       secret: admin.twoFactorSecret,
       encoding: 'base32',
       token: otp,
-      window: 1, // allow 30s before/after
+      window: 2, // allow 30s before/after
     });
 
     if (!isValid) {
@@ -457,4 +457,6 @@ export class AdminService {
     }
     return false;
   }
+
+  
 }
