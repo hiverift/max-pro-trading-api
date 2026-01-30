@@ -15,7 +15,7 @@ export class Trade extends Document {
   @Prop({ type: String, enum: ['up', 'down'], required: true })
   direction: string;
 
-  @Prop({ type: String, enum: ['demo', 'real'], required: true })
+  @Prop({ type: String, enum: ['demo', 'realBalance'], required: true })
   type: string;
 
   @Prop({ default: 'open' })

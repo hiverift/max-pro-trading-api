@@ -65,6 +65,7 @@ export class User extends Document {
 
   @Prop()
   forceLogoutAt?: Date; // force logout expiry
+  static referralEarnings: any;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

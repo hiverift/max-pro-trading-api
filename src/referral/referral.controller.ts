@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Body, UseGuards,Query, Req } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
+import { JwtAuthGuard} from 'src/common/gaurds/jwt.auth.guard';
 import { ReferralService } from './referral.service';
 
+import { RolesGuard } from 'src/common/gaurds/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 @Controller('referral')
 @UseGuards(JwtAuthGuard)
 export class ReferralController {
@@ -15,6 +17,22 @@ export class ReferralController {
   @Get('tree')
   getTree(@Req() req) {
     return this.referralService.getTree(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('getReferralTree')
+  async getReferralTree(@Req() req) {
+    return this.referralService.getReferralTree(req.user.userId);
+  }
+
+
+
+  // Admin: Get all referral logs
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'superadmin')
+  @Get('logs')
+  async getLogs() {
+    return this.referralService.getAllReferralLogs();
   }
 
   @Get('earnings')

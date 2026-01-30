@@ -6,8 +6,8 @@ export class Kyc extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ required: true })
-  phone: string; // Verified via OTP
+  @Prop({ required: false })
+  phone?: string; // Verified via OTP
 
   @Prop({ enum: ['pending', 'approved', 'rejected', 'expired'], default: 'pending' })
   status: string;
