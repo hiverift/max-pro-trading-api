@@ -136,7 +136,7 @@ export class AdminService {
 
 
   async getKycPending() {
-    const users = await this.userModel.find({ kycStatus: 'pending' }).select('email phone kycStatus');
+    const users = await this.userModel.find({ kycStatus: 'pending' });
     return new CustomResponse(200, 'Pending KYC users fetched', users);
   }
 

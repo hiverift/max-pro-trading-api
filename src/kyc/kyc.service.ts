@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import { CompleteKycDto, ReKycDto, StartKycDto } from './dto/create-kyc.dto';
 import CustomResponse from 'src/provider/custom-response.service';
 import { Otp } from 'src/auth/otp.schema';
+import { fileUpload } from 'src/util/fileupload';
 
 @Injectable()
 export class KycService {
@@ -67,39 +68,80 @@ export class KycService {
   }
 
 
-  async completeKyc(
-    userId: string,
-    dto: CompleteKycDto,
-    files: { pan: Express.Multer.File; aadhaar: Express.Multer.File },
-  ) {
-    const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('User not found');
+ async completeKyc(
+  userId: string,
+  dto: CompleteKycDto,
+  files: { pan?: Express.Multer.File; aadhaar?: Express.Multer.File },
+) {
+  const user = await this.userModel.findById(userId);
+  if (!user) throw new NotFoundException('User not found');
 
-    if (!files.pan || !files.aadhaar) {
-      throw new BadRequestException('PAN and Aadhaar images required');
-    }
+  const existingKyc = await this.kycModel.findOne({ userId });
 
-    const kyc = await this.kycModel.create({
-      userId,
-      phone: user.phone,
-      incomeBracket: dto.incomeBracket,
-      occupation: dto.occupation,
-      panNumber: dto.panNumber,
-      panImagePath: files.pan.path,
-      aadhaarNumber: dto.aadhaarNumber,
-      aadhaarImagePath: files.aadhaar.path,
-      isPep: dto.isPep || false,
-      status: 'pending',
-    });
+  let panImagePath: string | undefined;
+  let aadhaarImagePath: string | undefined;
+
+  if (files?.pan) {
+    const panFile = fileUpload('kyc/pan', files.pan);
+    panImagePath = `${process.env.SERVER_BASE_URL}/uploads/kyc/pan/${panFile}`;
+  }
+
+  if (files?.aadhaar) {
+    const aadhaarFile = fileUpload('kyc/aadhaar', files.aadhaar);
+    aadhaarImagePath = `${process.env.SERVER_BASE_URL}/uploads/kyc/aadhaar/${aadhaarFile}`;
+  }
+
+  // 🔁 UPDATE CASE
+  if (existingKyc) {
+    existingKyc.phone = dto.phone ?? existingKyc.phone;
+    existingKyc.incomeBracket = dto.incomeBracket ?? existingKyc.incomeBracket;
+    existingKyc.occupation = dto.occupation ?? existingKyc.occupation;
+    existingKyc.panNumber = dto.panNumber ?? existingKyc.panNumber;
+    existingKyc.aadhaarNumber = dto.aadhaarNumber ?? existingKyc.aadhaarNumber;
+    existingKyc.isPep = dto.isPep ?? existingKyc.isPep;
+
+    if (panImagePath) existingKyc.panImagePath = panImagePath;
+    if (aadhaarImagePath) existingKyc.aadhaarImagePath = aadhaarImagePath;
+
+    existingKyc.status = 'pending';
+    await existingKyc.save();
 
     user.kycStatus = 'pending';
     await user.save();
 
-    return new CustomResponse(200, 'KYC submitted for review', {
-      kycId: kyc._id,
-      status: kyc.status,
+    return new CustomResponse(200, 'KYC updated successfully', {
+      kycId: existingKyc._id,
+      status: existingKyc.status,
     });
   }
+
+  // 🆕 CREATE CASE
+  if (!files?.pan || !files?.aadhaar) {
+    throw new BadRequestException('PAN and Aadhaar images required');
+  }
+
+  const kyc = await this.kycModel.create({
+    userId,
+    phone: dto.phone,
+    incomeBracket: dto.incomeBracket,
+    occupation: dto.occupation,
+    panNumber: dto.panNumber,
+    panImagePath,
+    aadhaarNumber: dto.aadhaarNumber,
+    aadhaarImagePath,
+    isPep: dto.isPep || false,
+    status: 'pending',
+  });
+
+  user.kycStatus = 'pending';
+  await user.save();
+
+  return new CustomResponse(200, 'KYC submitted for review', {
+    kycId: kyc._id,
+    status: kyc.status,
+  });
+}
+
 
   async reKyc(userId: string, dto: ReKycDto, selfieFile: Express.Multer.File) {
     const user = await this.userModel.findById(userId);
@@ -109,8 +151,8 @@ export class KycService {
 
     const existingKyc = await this.kycModel.findOne({ userId });
     if (!existingKyc) throw new BadRequestException('No previous KYC found');
-
-    existingKyc.selfiePath = selfieFile.path;
+   const panCardPath = fileUpload('re-kyc/selfie', selfieFile.path );
+    existingKyc.selfiePath = `${process.env.SERVER_BASE_URL}/uploads/re-kyc/selfie/${panCardPath}`;
     existingKyc.isPep = dto.isPep ?? existingKyc.isPep;
     existingKyc.status = 'pending';
     await existingKyc.save();
@@ -171,21 +213,33 @@ export class KycService {
     return new CustomResponse(200, 'Your KYC documents deleted', { status: 'pending' });
   }
 
-  async getPendingKyc(limit: number = 10, skip: number = 0) {
-    const kycs = await this.kycModel
-      .find({ status: 'pending' })
-      .populate('userId', 'email phone')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+async getPendingKyc(limit: number = 10, skip: number = 0) {
+  const kycs = await this.kycModel
+    .find()
+    .populate({
+      path: 'userId',
+      select: 'email phone kycStatus',
+      match: { kycStatus: 'pending' }, 
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
-    const total = await this.kycModel.countDocuments({ status: 'pending' });
+  // populate ke baad null users aa sakte hain → filter karo
+  const filteredKycs = kycs.filter(k => k.userId);
 
-    return new CustomResponse(200, 'Pending KYC fetched', {
-      pendingKyc: kycs,
-      pagination: { total, limit, skip },
+  const total = await this.kycModel.countDocuments()
+    .populate({
+      path: 'userId',
+      match: { kycStatus: 'pending' },
     });
-  }
+
+  return new CustomResponse(200, 'Pending KYC fetched', {
+    pendingKyc: filteredKycs,
+    pagination: { total: filteredKycs.length, limit, skip },
+  });
+}
+
 
   async adminApproveKyc(kycId: string) {
     const kyc = await this.kycModel.findById(kycId);

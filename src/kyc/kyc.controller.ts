@@ -44,16 +44,7 @@ export class KycController {
   @UseGuards(JwtAuthGuard)
   @Post('complete')
   @UseInterceptors(
-    FilesInterceptor('documents', 2, {
-      dest: './uploads/kyc',
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png|pdf)$/)) {
-          return cb(new BadRequestException('Only jpg/png/pdf allowed!'), false);
-        }
-        cb(null, true);
-      },
-      limits: { fileSize: 6 * 1024 * 1024 }, // 6MB max
-    }),
+    FilesInterceptor('documents', 2),
   )
   async completeKyc(
     @Req() req,
@@ -65,7 +56,7 @@ export class KycController {
     }
 
     const [panFile, aadhaarFile] = files;
-
+   
     return this.kycService.completeKyc(req.user.userId, dto, {
       pan: panFile,
       aadhaar: aadhaarFile,
@@ -80,16 +71,7 @@ export class KycController {
   @UseGuards(JwtAuthGuard)
   @Post('re-kyc')
   @UseInterceptors(
-    FilesInterceptor('selfie', 1, {
-      dest: './uploads/kyc/selfie',
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
-          return cb(new BadRequestException('Only jpg/png allowed for selfie!'), false);
-        }
-        cb(null, true);
-      },
-      limits: { fileSize: 6 * 1024 * 1024 },
-    }),
+    FilesInterceptor('selfie', 1),
   )
   async reKyc(
     @Req() req,

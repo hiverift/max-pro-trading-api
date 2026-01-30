@@ -8,6 +8,7 @@ export class CompleteKycDto {
   @IsString() @IsNotEmpty() incomeBracket: string;
   @IsString() @IsNotEmpty() occupation: string;
   @IsString() @IsNotEmpty() panNumber: string;
+  @IsString() @IsNotEmpty() phone: string;
   @IsString() @IsNotEmpty() aadhaarNumber: string;
   @IsBoolean() @IsOptional() isPep?: boolean;
 }

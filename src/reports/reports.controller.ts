@@ -41,4 +41,5 @@ x
     res.setHeader('Content-Disposition', `attachment; filename=${type}_report.csv`);
     res.send(reportData.csvData);
   }
+
 }
