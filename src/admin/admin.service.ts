@@ -46,7 +46,7 @@ export class AdminService {
 
   async adminLogin(email: string, password: string, ip: string, userAgent: string) {
     console.log(`Admin login attempt for ${email}`);
-       const admin = await this.userModel.findOne({ email, role: { $in: ['admin', 'superadmin'] } });
+    const admin = await this.userModel.findOne({ email, role: { $in: ['admin', 'superadmin'] } });
 
 
     //     const admin = await this.userModel.findOne({
@@ -466,6 +466,11 @@ export class AdminService {
 
   // Risk Rule: Lock account after 5 failed logins in 5 min
   async checkLoginLock(email: string, ip: string) {
+    try {
+
+    } catch (error) {
+
+    }
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
     const failedAttempts = await this.loginLogModel.countDocuments({
       email,
@@ -482,18 +487,23 @@ export class AdminService {
   }
 
   async updateAdminPermissions(adminId: string, permissions: string[]) {
-    const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
-    if (!admin) throw new NotFoundException('Admin user not found');
+    try {
+      const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
+      if (!admin) throw new NotFoundException('Admin user not found');
 
-    admin.permissions = permissions;
-    await admin.save();
+      admin.permissions = permissions;
+      await admin.save();
 
-    await this.logAudit('update_permissions', adminId, { permissions });
+      await this.logAudit('update_permissions', adminId, { permissions });
 
-    return new CustomResponse(200, 'Admin permissions updated successfully', {
-      adminId,
-      permissions,
-    });
+      return new CustomResponse(200, 'Admin permissions updated successfully', {
+        adminId,
+        permissions,
+      });
+    } catch (error) {
+      throwException(error)
+
+    }
   }
 
   // ────────────────────────────────────────────────
@@ -543,50 +553,70 @@ export class AdminService {
   }
 
   async getAllPermissions() {
-    const permissions = await this.permissionModel.find().sort({ module: 1, name: 1 });
-    return new CustomResponse(200, 'Permissions fetched', permissions);
+    try {
+      const permissions = await this.permissionModel.find().sort({ module: 1, name: 1 });
+      return new CustomResponse(200, 'Permissions fetched', permissions);
+    } catch (error) {
+      throwException(error)
+
+    }
+
   }
 
   async createPermission(dto: { name: string; slug: string; module: string; description?: string }) {
-    const existing = await this.permissionModel.findOne({ slug: dto.slug.toUpperCase() });
-    if (existing) throw new BadRequestException('Permission slug already exists');
+    try {
+      const existing = await this.permissionModel.findOne({ slug: dto.slug.toUpperCase() });
+      if (existing) throw new BadRequestException('Permission slug already exists');
 
-    const permission = await this.permissionModel.create({ ...dto, slug: dto.slug.toUpperCase() });
-    return new CustomResponse(201, 'Permission created', permission);
+      const permission = await this.permissionModel.create({ ...dto, slug: dto.slug.toUpperCase() });
+      return new CustomResponse(201, 'Permission created', permission);
+    } catch (error) {
+      throwException(error)
+
+    }
   }
 
   async deletePermission(id: string) {
-    await this.permissionModel.findByIdAndDelete(id);
-    return new CustomResponse(200, 'Permission deleted');
+    try {
+      await this.permissionModel.findByIdAndDelete(id);
+      return new CustomResponse(200, 'Permission deleted');
+    } catch (error) {
+      throwException(error)
+
+    }
   }
 
   async getAllRoles() {
-    const roles = await this.roleModel.find().populate('permissions');
-    return new CustomResponse(200, 'Roles fetched', roles);
+    try {
+      const roles = await this.roleModel.find().populate('permissions');
+      return new CustomResponse(200, 'Roles fetched', roles);
+    } catch (error) {
+      throwException(error)
+    }
   }
 
   async createRole(dto: { name: string; permissions: string[]; description?: string }) {
-  try {
-    
-  } catch (error) {
-    
-  }
-    const role = await this.roleModel.create({
-      ...dto,
-      permissions: dto.permissions.map(id => new Types.ObjectId(id))
-    });
-    return new CustomResponse(201, 'Role created', role);
+    try {
+      const role = await this.roleModel.create({
+        ...dto,
+        permissions: dto.permissions.map(id => new Types.ObjectId(id))
+      });
+      return new CustomResponse(201, 'Role created', role);
+    } catch (error) {
+      throwException(error)
+    }
+
   }
 
   async updateRole(id: string, dto: { name?: string; permissions?: string[]; description?: string }) {
     try {
-       const role = await this.roleModel.findByIdAndUpdate(id, dto, { new: true }).populate('permissions');
-    if (!role) throw new NotFoundException('Role not found');
-    return new CustomResponse(200, 'Role updated', role);
+      const role = await this.roleModel.findByIdAndUpdate(id, dto, { new: true }).populate('permissions');
+      if (!role) throw new NotFoundException('Role not found');
+      return new CustomResponse(200, 'Role updated', role);
     } catch (error) {
       throwException(error)
     }
-   
+
   }
 
   async deleteRole(id: string) {
@@ -596,24 +626,24 @@ export class AdminService {
     } catch (error) {
       throwException(error)
     }
-      
+
   }
 
   async assignRolesToAdmin(adminId: string, roleIds: string[], customPermissions: string[] = []) {
     try {
-       const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
-    if (!admin) throw new NotFoundException('Admin not found');
+      const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
+      if (!admin) throw new NotFoundException('Admin not found');
 
-    admin.roles = roleIds.map(id => new Types.ObjectId(id));
-    admin.customPermissions = customPermissions;
-    await admin.save();
+      admin.roles = roleIds.map(id => new Types.ObjectId(id));
+      admin.customPermissions = customPermissions;
+      await admin.save();
 
-    await this.logAudit('assign_roles', adminId, { roles: roleIds, customPermissions });
+      await this.logAudit('assign_roles', adminId, { roles: roleIds, customPermissions });
 
-    return new CustomResponse(200, 'Roles and custom permissions assigned', { adminId, roleIds, customPermissions });
+      return new CustomResponse(200, 'Roles and custom permissions assigned', { adminId, roleIds, customPermissions });
     } catch (error) {
       throwException(error)
     }
-   
+
   }
 }

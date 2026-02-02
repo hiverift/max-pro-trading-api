@@ -226,7 +226,7 @@ export class AdminController {
   // DYNAMIC ROLE & PERMISSION MANAGEMENT (SUPER ADMIN)
   // ────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles('superadmin')
+  @Roles('superadmin','admin')
   @Get('permissions/list')
   async getAllPermissions() {
     return this.adminService.getAllPermissions();
