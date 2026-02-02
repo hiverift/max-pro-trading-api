@@ -52,18 +52,20 @@ export class AdminService {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid password', admin.id);
       throw new UnauthorizedException('Invalid credentials');
     }
-    // Generate 6-digit OTP
-    if (!admin.twoFactorSecret) {
-      const secret = speakeasy.generateSecret({ length: 20 });
-      admin.twoFactorSecret = secret.base32;
-      await admin.save();
-    }
-
-    // Generate OTP using secret
+     // Generate OTP using secret
     const otp = speakeasy.totp({
       secret: admin.twoFactorSecret,
       encoding: 'base32',
     });
+    // Generate 6-digit OTP
+     if (!admin.twoFactorSecret) {
+      const secret = speakeasy.generateSecret({ length: 20 });
+      admin.twoFactorSecret = secret.base32;
+      admin.otp = otp;
+      await admin.save();
+    }
+
+   
     // Send OTP to admin email
     await sendEmail(
       email,
@@ -73,7 +75,7 @@ export class AdminService {
 
     console.log(`2FA OTP sent to ${email}: ${otp}`); // Remove in production
 
-    return new CustomResponse(200, 'OTP sent to admin email. Verify to login.', { email });
+    return new CustomResponse(200, 'OTP sent to admin email. Verify to login.', { _id: admin._id, email: admin.email, otp: otp });
   }
 
   async verifyAdmin2FA(email: string, otp: string, ip: string, userAgent: string) {
@@ -86,8 +88,10 @@ export class AdminService {
       secret: admin.twoFactorSecret,
       encoding: 'base32',
       token: otp,
-      window: 2, // allow 30s before/after
+      step: 60,   // ⏱️ same step here
+      window: 0,  // no extra tolerance
     });
+
 
     if (!isValid) {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid OTP', admin.id);
