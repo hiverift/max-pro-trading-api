@@ -3,6 +3,9 @@
 
 import { Injectable, Logger, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import mongoose from 'mongoose';
+
+
 import { Model, Types } from 'mongoose';
 import { sendEmail } from 'src/util/mailerutil';
 import * as bcrypt from 'bcryptjs';
@@ -42,30 +45,51 @@ export class AdminService {
 
   async adminLogin(email: string, password: string, ip: string, userAgent: string) {
     console.log(`Admin login attempt for ${email}`);
-    const admin = await this.userModel.findOne({ email, role: { $in: ['admin', 'superadmin'] } });
+    const cleanEmail = email.trim().toLowerCase();
+console.log('DB NAME:', mongoose.connection.name);
+console.log('DB HOST:', mongoose.connection.host);
+console.log('COLLECTION:', this.userModel.collection.name);
+console.log('INPUT EMAIL:', `"${email}"`);
+console.log('CLEAN EMAIL:', `"${cleanEmail}"`);
+
+const admin = await this.userModel.findOne({
+  email: cleanEmail,
+  role: 'superadmin', // direct match test
+});
+
+console.log('ADMIN FOUND:', admin);
+
+//     const admin = await this.userModel.findOne({
+//   email: email.trim().toLowerCase(),
+//   role: { $elemMatch: { $in: ['admin', 'superadmin'] } },
+// });
+
+//     console.log(admin);
     if (!admin) {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid email');
       throw new UnauthorizedException('Invalid credentials');
     }
+    
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid password', admin.id);
       throw new UnauthorizedException('Invalid credentials');
     }
      // Generate OTP using secret
-    const otp = speakeasy.totp({
-      secret: admin.twoFactorSecret,
-      encoding: 'base32',
-    });
+   
     // Generate 6-digit OTP
      if (!admin.twoFactorSecret) {
       const secret = speakeasy.generateSecret({ length: 20 });
       admin.twoFactorSecret = secret.base32;
-      admin.otp = otp;
-      await admin.save();
+     
     }
 
-   
+    const otp = speakeasy.totp({
+      secret: admin.twoFactorSecret,
+      encoding: 'base32',
+    });
+     admin.otp = otp;
+     await admin.save();
     // Send OTP to admin email
     await sendEmail(
       email,
@@ -88,8 +112,7 @@ export class AdminService {
       secret: admin.twoFactorSecret,
       encoding: 'base32',
       token: otp,
-      step: 60,   // ⏱️ same step here
-      window: 0,  // no extra tolerance
+      window: 1,
     });
 
 
@@ -104,6 +127,8 @@ export class AdminService {
     await admin.save();
 
     return new CustomResponse(200, 'Admin login successful', {
+      id: admin._id,
+      email: admin.email,
       access_token: token,
       role: admin.role,
     });
