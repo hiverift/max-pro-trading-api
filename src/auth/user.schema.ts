@@ -60,6 +60,7 @@ export class User extends Document {
   @Prop() lastLogin?: Date;
   @Prop() isBlocked?: boolean;
   @Prop() blockReason?: string;
+    @Prop() otp?: string;
   @Prop({ default: false })
   isLocked: boolean;
 
