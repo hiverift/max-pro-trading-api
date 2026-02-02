@@ -21,6 +21,7 @@ import { LoginLog } from './schema/login-log.schema';
 import { AuditLog } from './schema/audit-log.schema';
 import { Permission } from './schema/permission.schema';
 import { Role } from './schema/role.schema';
+import { throwException } from 'src/util/errorhandling';
 
 @Injectable()
 export class AdminService {
@@ -45,51 +46,40 @@ export class AdminService {
 
   async adminLogin(email: string, password: string, ip: string, userAgent: string) {
     console.log(`Admin login attempt for ${email}`);
-    const cleanEmail = email.trim().toLowerCase();
-console.log('DB NAME:', mongoose.connection.name);
-console.log('DB HOST:', mongoose.connection.host);
-console.log('COLLECTION:', this.userModel.collection.name);
-console.log('INPUT EMAIL:', `"${email}"`);
-console.log('CLEAN EMAIL:', `"${cleanEmail}"`);
+       const admin = await this.userModel.findOne({ email, role: { $in: ['admin', 'superadmin'] } });
 
-const admin = await this.userModel.findOne({
-  email: cleanEmail,
-  role: 'superadmin', // direct match test
-});
 
-console.log('ADMIN FOUND:', admin);
+    //     const admin = await this.userModel.findOne({
+    //   email: email.trim().toLowerCase(),
+    //   role: { $elemMatch: { $in: ['admin', 'superadmin'] } },
+    // });
 
-//     const admin = await this.userModel.findOne({
-//   email: email.trim().toLowerCase(),
-//   role: { $elemMatch: { $in: ['admin', 'superadmin'] } },
-// });
-
-//     console.log(admin);
+    //     console.log(admin);
     if (!admin) {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid email');
       throw new UnauthorizedException('Invalid credentials');
     }
-    
+
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) {
       await this.logLoginAttempt(email, ip, userAgent, 'failed', 'Invalid password', admin.id);
       throw new UnauthorizedException('Invalid credentials');
     }
-     // Generate OTP using secret
-   
+    // Generate OTP using secret
+
     // Generate 6-digit OTP
-     if (!admin.twoFactorSecret) {
+    if (!admin.twoFactorSecret) {
       const secret = speakeasy.generateSecret({ length: 20 });
       admin.twoFactorSecret = secret.base32;
-     
+
     }
 
     const otp = speakeasy.totp({
       secret: admin.twoFactorSecret,
       encoding: 'base32',
     });
-     admin.otp = otp;
-     await admin.save();
+    admin.otp = otp;
+    await admin.save();
     // Send OTP to admin email
     await sendEmail(
       email,
@@ -576,6 +566,11 @@ console.log('ADMIN FOUND:', admin);
   }
 
   async createRole(dto: { name: string; permissions: string[]; description?: string }) {
+  try {
+    
+  } catch (error) {
+    
+  }
     const role = await this.roleModel.create({
       ...dto,
       permissions: dto.permissions.map(id => new Types.ObjectId(id))
@@ -584,18 +579,29 @@ console.log('ADMIN FOUND:', admin);
   }
 
   async updateRole(id: string, dto: { name?: string; permissions?: string[]; description?: string }) {
-    const role = await this.roleModel.findByIdAndUpdate(id, dto, { new: true }).populate('permissions');
+    try {
+       const role = await this.roleModel.findByIdAndUpdate(id, dto, { new: true }).populate('permissions');
     if (!role) throw new NotFoundException('Role not found');
     return new CustomResponse(200, 'Role updated', role);
+    } catch (error) {
+      throwException(error)
+    }
+   
   }
 
   async deleteRole(id: string) {
-    await this.roleModel.findByIdAndDelete(id);
-    return new CustomResponse(200, 'Role deleted');
+    try {
+      await this.roleModel.findByIdAndDelete(id);
+      return new CustomResponse(200, 'Role deleted');
+    } catch (error) {
+      throwException(error)
+    }
+      
   }
 
   async assignRolesToAdmin(adminId: string, roleIds: string[], customPermissions: string[] = []) {
-    const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
+    try {
+       const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
     if (!admin) throw new NotFoundException('Admin not found');
 
     admin.roles = roleIds.map(id => new Types.ObjectId(id));
@@ -605,5 +611,9 @@ console.log('ADMIN FOUND:', admin);
     await this.logAudit('assign_roles', adminId, { roles: roleIds, customPermissions });
 
     return new CustomResponse(200, 'Roles and custom permissions assigned', { adminId, roleIds, customPermissions });
+    } catch (error) {
+      throwException(error)
+    }
+   
   }
 }
