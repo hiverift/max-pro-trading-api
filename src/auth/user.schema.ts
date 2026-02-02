@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import test from 'node:test';
 
 @Schema({ timestamps: true })
@@ -18,6 +18,9 @@ export class User extends Document {
   @Prop({ default: 'pending', enum: ['pending', 'approved', 'rejected'] }) kycStatus: string;
   @Prop() kycDocument?: string;
   @Prop({ default: 'user', enum: ['user', 'admin', 'superadmin', 'affiliate'] }) role: string;
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Role' }], default: [] }) roles: Types.ObjectId[];
+  @Prop({ type: [String], default: [] }) permissions: string[]; // Legacy / Direct override
+  @Prop({ type: [String], default: [] }) customPermissions: string[]; // Specific extra permissions
   @Prop() twoFactorSecret?: string;
   @Prop({ default: false }) twoFactorEnabled: boolean;
   @Prop({ default: true }) withdrawalEnabled: boolean;

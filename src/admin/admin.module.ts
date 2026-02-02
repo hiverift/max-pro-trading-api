@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Admin,AdminSchema } from './schema/admin.schema';
+import { Admin, AdminSchema } from './schema/admin.schema';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { UserSchema } from 'src/auth/user.schema';
@@ -11,6 +11,8 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from '../auth/jwt.strategy'; // reuse your existing JWT strategy
 import { LoginLog, LoginLogSchema } from './schema/login-log.schema';
 import { AuditLog, AuditLogSchema } from './schema/audit-log.schema';
+import { Permission, PermissionSchema } from './schema/permission.schema';
+import { Role, RoleSchema } from './schema/role.schema';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { AuditLog, AuditLogSchema } from './schema/audit-log.schema';
       { name: 'Trade', schema: TradeSchema },
       { name: LoginLog.name, schema: LoginLogSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
+      { name: Permission.name, schema: PermissionSchema },
+      { name: Role.name, schema: RoleSchema },
     ]),
     PassportModule,
     JwtModule.register({
@@ -32,4 +36,4 @@ import { AuditLog, AuditLogSchema } from './schema/audit-log.schema';
   providers: [AdminService, JwtStrategy],
   exports: [AdminService],
 })
-export class AdminModule {}
+export class AdminModule { }

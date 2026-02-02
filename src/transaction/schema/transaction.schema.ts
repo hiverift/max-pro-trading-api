@@ -6,17 +6,33 @@ export class Transaction extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ enum: ['deposit', 'withdraw', 'bonus_credit', 'bonus_expiry', 'trade_win', 'trade_loss', 'referral_commission'], required: true })
+  @Prop({
+    enum: [
+      'deposit',
+      'withdraw',
+      'bonus_credit',
+      'bonus_expiry',
+      'bonus_usage',
+      'trade_win',
+      'trade_loss',
+      'referral_commission',
+      'referral_bonus'
+    ],
+    required: true
+  })
   type: string;
 
   @Prop({ required: true })
-  amount: number; 
+  amount: number;
 
-  @Prop({ enum: ['pending', 'success', 'failed', 'rejected', 'expired'], default: 'pending' })
+  @Prop({
+    enum: ['pending', 'success', 'failed', 'rejected', 'expired'],
+    default: 'pending'
+  })
   status: string;
 
   @Prop()
-  method?: string; 
+  method?: string;
 
   @Prop({ unique: true })
   transactionId: string;
@@ -25,13 +41,22 @@ export class Transaction extends Document {
   description: string;
 
   @Prop({ type: Date })
-  expiresAt?: Date; 
+  expiresAt?: Date;
 
   @Prop()
   rejectionReason?: string;
 
   @Prop({ type: Object })
-  paymentLogs?: any; 
+  paymentLogs?: any;
+
+  @Prop({ default: false })
+  isDemo?: boolean;
+
+  @Prop({ default: 0 })
+  commissionDeducted?: number;
+
+  @Prop({ default: false })
+  riskFlag?: boolean;
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);

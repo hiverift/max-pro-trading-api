@@ -1,13 +1,15 @@
-import { Controller, Get, Post, Body, UseGuards,Query, Req } from '@nestjs/common';
-import { JwtAuthGuard} from 'src/common/gaurds/jwt.auth.guard';
+import { Controller, Get, Post, Body, UseGuards, Query, Req } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
 import { ReferralService } from './referral.service';
 
 import { RolesGuard } from 'src/common/gaurds/roles.guard';
+import { PermissionsGuard } from 'src/common/gaurds/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Permissions } from '../common/decorators/permissions.decorator';
 @Controller('referral')
 @UseGuards(JwtAuthGuard)
 export class ReferralController {
-  constructor(private referralService: ReferralService) {}
+  constructor(private referralService: ReferralService) { }
 
   @Get('code')
   getCode(@Req() req) {
@@ -28,8 +30,9 @@ export class ReferralController {
 
 
   // Admin: Get all referral logs
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('VIEW_REFERRALS')
   @Get('logs')
   async getLogs() {
     return this.referralService.getAllReferralLogs();
@@ -51,7 +54,7 @@ export class ReferralController {
   }
 
   @Get('statistics')
-  getStatistics(@Req() req, @Query('period') period: 'day' | 'week' | 'month' = 'day') {
+  getStatistics(@Req() req, @Query('period') period: 'daily' | 'weekly' | 'monthly' = 'daily') {
     return this.referralService.getStatistics(req.user.userId, period);
   }
 

@@ -6,15 +6,21 @@ import { User, UserSchema } from '../auth/user.schema';  // ← Import schema
 import { WalletModule } from '../wallet/wallet.module';
 import { UserModule } from 'src/user/user.module';
 import { forwardRef } from '@nestjs/common';
-import { Transaction,TransactionSchema } from 'src/wallet/schema/transaction.schema';
+import { Transaction, TransactionSchema } from 'src/transaction/schema/transaction.schema';
+import { Trade, TradeSchema } from 'src/trade/schema/trade.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+  imports: [
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: 'Transaction', schema: TransactionSchema },
+      { name: 'Trade', schema: TradeSchema },
+    ]),
     UserModule,
-   forwardRef(() => WalletModule),
+    forwardRef(() => WalletModule),
   ],
   controllers: [ReferralController],
   providers: [ReferralService],
   exports: [ReferralService],
 })
-export class ReferralModule {}
+export class ReferralModule { }

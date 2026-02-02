@@ -56,12 +56,15 @@ export class AuthService {
       });
 
       if (dto.referralCode) {
+        const normalizedCode = dto.referralCode.toUpperCase();
         const parent = await this.userModel.findOne({
-          referralCode: dto.referralCode,
+          referralCode: normalizedCode,
         });
         if (parent) {
-          user.parentReferral = dto.referralCode;
-          parent.referrals.push(referralCode);
+          user.parentReferral = normalizedCode;
+          if (!parent.referrals.includes(referralCode)) {
+            parent.referrals.push(referralCode);
+          }
           await parent.save();
         }
       }

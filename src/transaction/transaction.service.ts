@@ -1,15 +1,17 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Transaction } from './schema/transaction.schema';
 import { User } from '../auth/user.schema';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ReferralService } from '../referral/referral.service';
 
 @Injectable()
 export class TransactionService {
     constructor(
         @InjectModel(Transaction.name) private txModel: Model<Transaction>,
         @InjectModel('User') private userModel: Model<User>,
+        @Inject(forwardRef(() => ReferralService)) private referralService: ReferralService,
     ) { }
 
     // Create Deposit Request
@@ -79,8 +81,12 @@ export class TransactionService {
         if (!user) throw new NotFoundException('User not found');
         if (tx.type === 'deposit') {
             user.realBalance += tx.amount;
+            // Credit commission to parent referral
+            if (user.parentReferral) {
+                await this.referralService.creditDepositCommission(user._id.toString(), tx.amount);
+            }
         } else if (tx.type === 'withdraw') {
-            user.realBalance += tx.amount; 
+            user.realBalance += tx.amount;
         }
         await user.save();
 

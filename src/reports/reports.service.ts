@@ -5,7 +5,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../auth/user.schema';
-import { Transaction } from 'src/wallet/schema/transaction.schema';
+import { Transaction } from 'src/transaction/schema/transaction.schema';
 import { Trade } from 'src/trade/schema/trade.schema';
 import { stringify } from 'csv-stringify/sync'; // npm install csv-stringify
 import CustomResponse from 'src/provider/custom-response.service';
@@ -16,7 +16,7 @@ export class ReportsService {
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Transaction') private transactionModel: Model<Transaction>,
     @InjectModel('Trade') private tradeModel: Model<Trade>,
-  ) {}
+  ) { }
 
   // Get User Reports (with filters: date, kycStatus, referral, balance >0, etc.)
   async getUserReports(query: any = {}) {
@@ -112,5 +112,5 @@ export class ReportsService {
     });
   }
 
-  
+
 }

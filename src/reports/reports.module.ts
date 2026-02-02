@@ -6,8 +6,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 import { UserSchema } from '../auth/user.schema';
-import { Transaction, TransactionSchema } from 'src/wallet/schema/transaction.schema';
-import { Trade ,TradeSchema} from 'src/trade/schema/trade.schema';
+import { Transaction, TransactionSchema } from 'src/transaction/schema/transaction.schema';
+import { Trade, TradeSchema } from 'src/trade/schema/trade.schema';
 
 @Module({
   imports: [
@@ -20,4 +20,4 @@ import { Trade ,TradeSchema} from 'src/trade/schema/trade.schema';
   controllers: [ReportsController],
   providers: [ReportsService],
 })
-export class ReportsModule {}
+export class ReportsModule { }

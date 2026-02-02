@@ -8,7 +8,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   app.enableCors();
 
-  await app.listen(process.env.PORT || 3000);
-  console.log('App running on http://localhost:3000');
+  await app.listen(process.env.PORT as string);
+  console.log(`App running on http://localhost:${process.env.PORT}`);
 }
 bootstrap();

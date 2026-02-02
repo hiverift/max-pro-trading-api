@@ -23,8 +23,25 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: any) {
-    const user = await this.userModel.findById(payload.sub);
+    const user = await this.userModel.findById(payload.sub)
+      .populate({
+        path: 'roles',
+        populate: { path: 'permissions' }
+      });
+
     if (!user) throw new UnauthorizedException();
+
+    // Flatten role permissions
+    const rolePermissions: string[] = [];
+    if (user.roles) {
+      user.roles.forEach((role: any) => {
+        if (role.permissions) {
+          role.permissions.forEach((perm: any) => {
+            if (perm.slug) rolePermissions.push(perm.slug);
+          });
+        }
+      });
+    }
 
     // 🔥 Kill old tokens only
     if (
@@ -43,6 +60,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       userId: payload.sub,
       email: payload.email,
       role: payload.role,
+      permissions: user.permissions || [],
+      customPermissions: (user as any).customPermissions || [],
+      rolePermissions,
     };
   }
 

@@ -16,7 +16,9 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
 import { RolesGuard } from 'src/common/gaurds/roles.guard';
+import { PermissionsGuard } from 'src/common/gaurds/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { KycService } from './kyc.service';
 import { StartKycDto, CompleteKycDto, ReKycDto } from './dto/create-kyc.dto';
 
@@ -56,7 +58,7 @@ export class KycController {
     }
 
     const [panFile, aadhaarFile] = files;
-   
+
     return this.kycService.completeKyc(req.user.userId, dto, {
       pan: panFile,
       aadhaar: aadhaarFile,
@@ -97,29 +99,32 @@ export class KycController {
     return this.kycService.deleteKyc(req.user.userId);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('VIEW_KYC')
   @Get('pending')
   async getPendingKyc(@Query('limit') limit = '10', @Query('skip') skip = '0') {
     return this.kycService.getPendingKyc(+limit, +skip);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('MANAGE_KYC')
   @Put(':kycId/approve')
   async approveKyc(@Param('kycId') kycId: string) {
     return this.kycService.adminApproveKyc(kycId);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('MANAGE_KYC')
   @Put(':kycId/reject')
   async rejectKyc(@Param('kycId') kycId: string, @Body('reason') reason: string) {
     if (!reason?.trim()) throw new BadRequestException('Reason required');
     return this.kycService.adminRejectKyc(kycId, reason.trim());
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('superadmin')
   @Delete(':kycId')
   async deleteKyc(@Param('kycId') kycId: string) {

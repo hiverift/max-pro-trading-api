@@ -27,6 +27,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { TicketModule } from './ticket/ticket.module';
 import { NotificationModule } from './notification/notification.module';
 import { ReportsModule } from './reports/reports.module';
+console.log(process.env.MONGO_URI);
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -44,7 +45,7 @@ import { ReportsModule } from './reports/reports.module';
     CacheModule.register({ isGlobal: true }),
     TerminusModule,
     JwtModule.register({
-      global: true,   
+      global: true,
       secret: process.env.JWT_SECRET || 'default_secret',
       signOptions: { expiresIn: '1h' },
     }),
@@ -64,6 +65,6 @@ import { ReportsModule } from './reports/reports.module';
 
   ],
   controllers: [HealthController, PromoController, UserController],  // ← Only root controllers here
-  providers: [ReferralService, UserService,GoogleStrategy],
+  providers: [UserService, GoogleStrategy],
 })
 export class AppModule { }

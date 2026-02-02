@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -6,10 +6,11 @@ import * as cacheManager from 'cache-manager';
 import { Cron } from '@nestjs/schedule';
 
 import { User } from '../auth/user.schema';
-import { Transaction } from './schema/transaction.schema';
+import { Transaction } from 'src/transaction/schema/transaction.schema';
 import { DepositDto } from './dtos/deposit.dto';
 import { WithdrawDto } from './dtos/withdraw.dto';
 import { Trade } from '../trade/schema/trade.schema';
+import { ReferralService } from '../referral/referral.service';
 
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
@@ -25,6 +26,7 @@ export class WalletService {
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Transaction') private transactionModel: Model<Transaction>,
     @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
+    @Inject(forwardRef(() => ReferralService)) private referralService: ReferralService,
   ) { }
 
   // ===================== DEPOSIT =====================
@@ -72,6 +74,11 @@ export class WalletService {
 
     user.realBalance += tx.amount;
     await user.save();
+
+    // Credit commission to parent referral if exists
+    if (user.parentReferral) {
+      await this.referralService.creditDepositCommission(user._id.toString(), tx.amount);
+    }
 
     await this.cacheManager.del(`dashboard_${tx.userId}`);
 
@@ -123,7 +130,7 @@ export class WalletService {
 
     const expired = await this.transactionModel.find({
       type: 'bonus_credit',
-      expiry: { $lt: new Date() },
+      expiresAt: { $lt: new Date() },
       status: 'success',
     });
 
@@ -207,7 +214,7 @@ export class WalletService {
       userId,
       type: 'bonus_credit',
       amount,
-      expiry,
+      expiresAt: expiry,
       status: 'success',
     });
 

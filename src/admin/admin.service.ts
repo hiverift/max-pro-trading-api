@@ -3,12 +3,12 @@
 
 import { Injectable, Logger, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { sendEmail } from 'src/util/mailerutil';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '../auth/user.schema';
-import { Transaction } from 'src/wallet/schema/transaction.schema';
+import { Transaction } from 'src/transaction/schema/transaction.schema';
 import { Trade } from 'src/trade/schema/trade.schema';
 import CustomResponse from 'src/provider/custom-response.service';
 import CustomError from 'src/provider/customer-error.service';
@@ -16,6 +16,8 @@ import * as speakeasy from 'speakeasy';
 import axios from 'axios';
 import { LoginLog } from './schema/login-log.schema';
 import { AuditLog } from './schema/audit-log.schema';
+import { Permission } from './schema/permission.schema';
+import { Role } from './schema/role.schema';
 
 @Injectable()
 export class AdminService {
@@ -27,9 +29,11 @@ export class AdminService {
     @InjectModel('Trade') private tradeModel: Model<Trade>,
     @InjectModel(LoginLog.name) private loginLogModel: Model<LoginLog>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
+    @InjectModel(Permission.name) private permissionModel: Model<Permission>,
+    @InjectModel(Role.name) private roleModel: Model<Role>,
     private jwtService: JwtService,
   ) {
-
+    this.bootstrapPermissions();
   }
 
   // ────────────────────────────────────────────────
@@ -458,5 +462,119 @@ export class AdminService {
     return false;
   }
 
-  
+  async updateAdminPermissions(adminId: string, permissions: string[]) {
+    const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
+    if (!admin) throw new NotFoundException('Admin user not found');
+
+    admin.permissions = permissions;
+    await admin.save();
+
+    await this.logAudit('update_permissions', adminId, { permissions });
+
+    return new CustomResponse(200, 'Admin permissions updated successfully', {
+      adminId,
+      permissions,
+    });
+  }
+
+  // ────────────────────────────────────────────────
+  // DYNAMIC PERMISSION & ROLE MANAGEMENT
+  // ────────────────────────────────────────────────
+
+  private async bootstrapPermissions() {
+    const defaultPermissions = [
+      { name: 'View Dashboard', slug: 'VIEW_DASHBOARD', module: 'Dashboard' },
+
+      { name: 'View Users List', slug: 'VIEW_USERS', module: 'Users' },
+      { name: 'Manage User Profiles', slug: 'MANAGE_USERS', module: 'Users' },
+      { name: 'Block/Unblock Users', slug: 'BLOCK_USERS', module: 'Users' },
+
+      { name: 'View Pending KYC', slug: 'VIEW_KYC', module: 'KYC' },
+      { name: 'Approve/Reject KYC', slug: 'MANAGE_KYC', module: 'KYC' },
+
+      { name: 'View Financial Logs', slug: 'VIEW_FINANCE', module: 'Finance' },
+      { name: 'Approve Deposits', slug: 'APPROVE_DEPOSITS', module: 'Finance' },
+      { name: 'Manage Withdrawals', slug: 'MANAGE_WITHDRAWALS', module: 'Finance' },
+      { name: 'Balance Adjustment', slug: 'ADJUST_BALANCE', module: 'Finance' },
+
+      { name: 'View Security Logs', slug: 'VIEW_SECURITY', module: 'Security' },
+      { name: 'Manage Forced Logout', slug: 'MANAGE_SECURITY', module: 'Security' },
+
+      { name: 'View Assets', slug: 'VIEW_ASSETS', module: 'Trade' },
+      { name: 'Manage Trade Settings', slug: 'MANAGE_TRADES', module: 'Trade' },
+
+      { name: 'View Support Tickets', slug: 'VIEW_SUPPORT', module: 'Tickets' },
+      { name: 'Reply Support Tickets', slug: 'REPLY_SUPPORT', module: 'Tickets' },
+
+      { name: 'View User Reports', slug: 'VIEW_REPORTS_USERS', module: 'Reports' },
+      { name: 'View Finance Reports', slug: 'VIEW_REPORTS_FINANCE', module: 'Reports' },
+      { name: 'View Trade Reports', slug: 'VIEW_REPORTS_TRADE', module: 'Reports' },
+      { name: 'Export Data CSV', slug: 'EXPORT_REPORTS', module: 'Reports' },
+
+      { name: 'View Notification Logs', slug: 'VIEW_NOTIFICATIONS', module: 'Notifications' },
+      { name: 'Send Notifications', slug: 'SEND_NOTIFICATIONS', module: 'Notifications' },
+
+      { name: 'View Referral Logs', slug: 'VIEW_REFERRALS', module: 'Referrals' },
+    ];
+
+    for (const p of defaultPermissions) {
+      await this.permissionModel.updateOne({ slug: p.slug }, { $set: p }, { upsert: true });
+    }
+    this.logger.log('Permissions bootstrapped');
+  }
+
+  async getAllPermissions() {
+    const permissions = await this.permissionModel.find().sort({ module: 1, name: 1 });
+    return new CustomResponse(200, 'Permissions fetched', permissions);
+  }
+
+  async createPermission(dto: { name: string; slug: string; module: string; description?: string }) {
+    const existing = await this.permissionModel.findOne({ slug: dto.slug.toUpperCase() });
+    if (existing) throw new BadRequestException('Permission slug already exists');
+
+    const permission = await this.permissionModel.create({ ...dto, slug: dto.slug.toUpperCase() });
+    return new CustomResponse(201, 'Permission created', permission);
+  }
+
+  async deletePermission(id: string) {
+    await this.permissionModel.findByIdAndDelete(id);
+    return new CustomResponse(200, 'Permission deleted');
+  }
+
+  async getAllRoles() {
+    const roles = await this.roleModel.find().populate('permissions');
+    return new CustomResponse(200, 'Roles fetched', roles);
+  }
+
+  async createRole(dto: { name: string; permissions: string[]; description?: string }) {
+    const role = await this.roleModel.create({
+      ...dto,
+      permissions: dto.permissions.map(id => new Types.ObjectId(id))
+    });
+    return new CustomResponse(201, 'Role created', role);
+  }
+
+  async updateRole(id: string, dto: { name?: string; permissions?: string[]; description?: string }) {
+    const role = await this.roleModel.findByIdAndUpdate(id, dto, { new: true }).populate('permissions');
+    if (!role) throw new NotFoundException('Role not found');
+    return new CustomResponse(200, 'Role updated', role);
+  }
+
+  async deleteRole(id: string) {
+    await this.roleModel.findByIdAndDelete(id);
+    return new CustomResponse(200, 'Role deleted');
+  }
+
+  async assignRolesToAdmin(adminId: string, roleIds: string[], customPermissions: string[] = []) {
+    const admin = await this.userModel.findOne({ _id: adminId, role: { $in: ['admin', 'superadmin'] } });
+    if (!admin) throw new NotFoundException('Admin not found');
+
+    admin.roles = roleIds.map(id => new Types.ObjectId(id));
+    admin.customPermissions = customPermissions;
+    await admin.save();
+
+    await this.logAudit('assign_roles', adminId, { roles: roleIds, customPermissions });
+
+    return new CustomResponse(200, 'Roles and custom permissions assigned', { adminId, roleIds, customPermissions });
+  }
 }

@@ -18,14 +18,16 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/common/gaurds/jwt.auth.guard';
 import { RolesGuard } from 'src/common/gaurds/roles.guard';
+import { PermissionsGuard } from 'src/common/gaurds/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { TicketService } from './ticket.service';
 import { UseInterceptors } from '@nestjs/common';
 import { Express } from 'express';
 import { Multer } from 'multer';
 @Controller('ticket')
 export class TicketController {
-  constructor(private readonly ticketService: TicketService) {}
+  constructor(private readonly ticketService: TicketService) { }
 
   // 1. User: Create new ticket (with optional file upload)
   @UseGuards(JwtAuthGuard)
@@ -66,8 +68,9 @@ export class TicketController {
   // ────────────────────────────────────────────────
 
   // Admin: Get all tickets (paginated + filters)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('VIEW_SUPPORT')
   @Get()
   async getAllTickets(
     @Query('status') status?: string,
@@ -79,8 +82,9 @@ export class TicketController {
   }
 
   // Admin: Reply to any ticket
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('REPLY_SUPPORT')
   @Put(':id/reply')
   async adminReply(@Param('id') id: string, @Body('message') message: string) {
     if (!message?.trim()) throw new BadRequestException('Message is required');
@@ -88,8 +92,9 @@ export class TicketController {
   }
 
   // Admin: Update ticket status / priority
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
+  @Permissions('REPLY_SUPPORT')
   @Put(':id/status')
   async updateStatus(
     @Param('id') id: string,

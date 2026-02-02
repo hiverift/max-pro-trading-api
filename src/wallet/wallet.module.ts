@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
-import { TransactionSchema } from './schema/transaction.schema';
+import { Transaction, TransactionSchema } from 'src/transaction/schema/transaction.schema';
 import { UserSchema } from '../auth/user.schema';
 import { TradeModule } from 'src/trade/trade.module';
+import { ReferralModule } from 'src/referral/referral.module';
 
 
 @Module({
@@ -14,9 +15,10 @@ import { TradeModule } from 'src/trade/trade.module';
       { name: 'User', schema: UserSchema },
     ]),
     TradeModule,
+    ReferralModule,
   ],
   controllers: [WalletController],
   providers: [WalletService],
   exports: [WalletService],
 })
-export class WalletModule {}
+export class WalletModule { }
