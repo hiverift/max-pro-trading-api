@@ -619,6 +619,52 @@ export class AdminService {
 
   }
 
+  async getUserAccessibleModules(user: any) {
+    if (user.role === 'superadmin') {
+      const allPermissions = await this.permissionModel.find();
+      const modulesMap = new Map<string, string[]>();
+
+      allPermissions.forEach(p => {
+        const perms = modulesMap.get(p.module) || [];
+        perms.push(p.slug);
+        modulesMap.set(p.module, perms);
+      });
+
+      const result = Array.from(modulesMap.entries()).map(([module, permissions]) => ({
+        module,
+        permissions
+      }));
+
+      return new CustomResponse(200, 'Accessible modules fetched', result);
+    }
+
+    const allSlugs = [
+      ...(user.permissions || []),
+      ...(user.customPermissions || []),
+      ...(user.rolePermissions || [])
+    ];
+
+    if (allSlugs.includes('ALL_ACCESS')) {
+      return this.getUserAccessibleModules({ role: 'superadmin' });
+    }
+
+    const permissions = await this.permissionModel.find({ slug: { $in: allSlugs } });
+    const modulesMap = new Map<string, string[]>();
+
+    permissions.forEach(p => {
+      const perms = modulesMap.get(p.module) || [];
+      perms.push(p.slug);
+      modulesMap.set(p.module, perms);
+    });
+
+    const result = Array.from(modulesMap.entries()).map(([module, permissions]) => ({
+      module,
+      permissions
+    }));
+
+    return new CustomResponse(200, 'Accessible modules fetched', result);
+  }
+
   async deleteRole(id: string) {
     try {
       await this.roleModel.findByIdAndDelete(id);

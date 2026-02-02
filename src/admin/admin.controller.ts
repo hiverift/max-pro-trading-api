@@ -34,6 +34,12 @@ export class AdminController {
     return this.adminService.getDashboard();
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'superadmin')
+  @Get('my-access')
+  async getMyAccess(@Req() req: any) {
+    return this.adminService.getUserAccessibleModules(req.user);
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin', 'superadmin')
